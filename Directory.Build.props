@@ -15,8 +15,4 @@
         <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
         <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
     </PropertyGroup>
-
-    <ItemGroup>
-		<SupportedOSPlatform Include="windows"/>
-	</ItemGroup>
 </Project>

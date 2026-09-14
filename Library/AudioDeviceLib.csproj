@@ -1,23 +1,31 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFrameworks>net48;netstandard2.0;net8.0-windows</TargetFrameworks>
+    <AppendTargetFrameworkToOutputPath>true</AppendTargetFrameworkToOutputPath>
+
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>disable</Nullable>
-    <LangVersion>latest</LangVersion>
 
-    <!-- Windows-only: relies on Core Audio COM (WASAPI) + the undocumented IPolicyConfig. -->
-    <SupportedOSPlatform>windows</SupportedOSPlatform>
     <EnableComHosting>false</EnableComHosting>
 
     <RootNamespace>AudioDeviceLib</RootNamespace>
     <AssemblyName>AudioDeviceLib</AssemblyName>
 
     <Product>AudioDeviceLib</Product>
-    <Description>Managed .NET 8 library to enumerate Windows audio devices and set the default playback/recording device, plus volume and mute control. Core Audio interop derived from AudioDeviceCmdlets (frgnca) / CoreAudioApi (Ray Molenkamp).</Description>
+    <Description>Managed library to enumerate Windows audio devices and set the default playback/recording device, plus volume and mute control.
+      Targets .NET Framework 4.8, .NET Standard 2.0 and .NET 8 (Windows).
+      Core Audio interop derived from AudioDeviceCmdlets (frgnca) / CoreAudioApi (Ray Molenkamp).
+    </Description>
     <Version>1.0.0</Version>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
   </PropertyGroup>
+
+  <!-- Build-time-only: lets the .NET SDK compile the net48 target without a machine-wide
+       .NET Framework Developer Pack. No runtime dependency (PrivateAssets=all). -->
+  <ItemGroup Condition="'$(TargetFrameworkIdentifier)' == '.NETFramework'">
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
 
 </Project>
