@@ -20,7 +20,22 @@
     <Version>1.0.0</Version>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageProjectUrl>https://github.com/psulek/AudioDeviceLib</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/psulek/AudioDeviceLib</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <PackageTags>audio;wasapi;core-audio;default-audio-device;volume;mute;windows;com-interop</PackageTags>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
+
+  <!-- Ship the repo-root README on the nuget.org package page (it lives one level up). -->
+  <ItemGroup>
+    <None Include="..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <!-- Build-time-only: lets the .NET SDK compile the net48 target without a machine-wide
        .NET Framework Developer Pack. No runtime dependency (PrivateAssets=all). -->

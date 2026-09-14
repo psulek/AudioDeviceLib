@@ -2,6 +2,7 @@ bin/
 obj/
 *.user
 .vs/
+artifacts/
 
 # Rider churns this file; keep it local
 .idea/**/vcs.xml
