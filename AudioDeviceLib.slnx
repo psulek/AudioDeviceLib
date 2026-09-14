@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="Library/AudioDeviceLib.csproj" />
+  <Project Path="Library.Test/Library.Test.csproj" />
+</Solution>

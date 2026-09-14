@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <LangVersion>latest</LangVersion>
+
+    <!-- Windows-only: relies on Core Audio COM (WASAPI) + the undocumented IPolicyConfig. -->
+    <SupportedOSPlatform>windows</SupportedOSPlatform>
+    <EnableComHosting>false</EnableComHosting>
+
+    <RootNamespace>AudioDeviceLib</RootNamespace>
+    <AssemblyName>AudioDeviceLib</AssemblyName>
+
+    <Product>AudioDeviceLib</Product>
+    <Description>Managed .NET 8 library to enumerate Windows audio devices and set the default playback/recording device, plus volume and mute control. Core Audio interop derived from AudioDeviceCmdlets (frgnca) / CoreAudioApi (Ray Molenkamp).</Description>
+    <Authors>Peter Šulek</Authors>
+    <Copyright>(c) 2026 Peter Šulek. Portions (c) 2016-2022 Francois Gendron (MIT) and (c) 2007-2010 Ray Molenkamp (zlib-style).</Copyright>
+    <Version>1.0.0</Version>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+  </PropertyGroup>
+
+</Project>
