@@ -81,44 +81,44 @@ public sealed class AudioController
     // ---- Setting the default ------------------------------------------------------
 
     /// <summary>Sets the given device as the default for the requested role(s).</summary>
-    public void SetDefaultDevice(AudioDevice device, DefaultRole role = DefaultRole.MultimediaAndCommunications)
+    public void SetDefaultDevice(AudioDevice device, DefaultRole roles = DefaultRole.Default)
     {
         if (device == null)
         {
             throw new ArgumentNullException(nameof(device));
         }
 
-        SetDefaultDevice(device.Id, role);
+        SetDefaultDevice(device.Id, roles);
     }
 
-    /// <summary>Sets the endpoint with the given ID as the default for the requested role(s).</summary>
-    public void SetDefaultDevice(string deviceId, DefaultRole role = DefaultRole.MultimediaAndCommunications)
+    /// <summary>
+    /// Sets the endpoint with the given ID as the default for the requested role(s).
+    /// <paramref name="roles"/> is a bit flag; each set flag maps to one native ERole call.
+    /// </summary>
+    public void SetDefaultDevice(string deviceId, DefaultRole roles = DefaultRole.Default)
     {
         if (string.IsNullOrEmpty(deviceId))
         {
             throw new ArgumentNullException(nameof(deviceId));
         }
 
-        var client = new PolicyConfigClient();
-        switch (role)
+        if ((roles & DefaultRole.All) == 0)
         {
-            case DefaultRole.Multimedia:
-                client.SetDefaultEndpoint(deviceId, ERole.eMultimedia);
-                break;
-            case DefaultRole.Communications:
-                client.SetDefaultEndpoint(deviceId, ERole.eCommunications);
-                break;
-            case DefaultRole.All:
-                client.SetDefaultEndpoint(deviceId, ERole.eConsole);
-                client.SetDefaultEndpoint(deviceId, ERole.eMultimedia);
-                client.SetDefaultEndpoint(deviceId, ERole.eCommunications);
-                break;
-            case DefaultRole.MultimediaAndCommunications:
-            default:
-                // Same pair, in the same order, as Set-AudioDevice with no switch.
-                client.SetDefaultEndpoint(deviceId, ERole.eCommunications);
-                client.SetDefaultEndpoint(deviceId, ERole.eMultimedia);
-                break;
+            throw new ArgumentException("At least one role (Console, Multimedia or Communications) must be specified.", nameof(roles));
+        }
+
+        var client = new PolicyConfigClient();
+        if ((roles & DefaultRole.Console) != 0)
+        {
+            client.SetDefaultEndpoint(deviceId, ERole.eConsole);
+        }
+        if ((roles & DefaultRole.Multimedia) != 0)
+        {
+            client.SetDefaultEndpoint(deviceId, ERole.eMultimedia);
+        }
+        if ((roles & DefaultRole.Communications) != 0)
+        {
+            client.SetDefaultEndpoint(deviceId, ERole.eCommunications);
         }
     }
 
@@ -128,12 +128,12 @@ public sealed class AudioController
     /// Finds the first active playback endpoint whose name contains nameSubstring
     /// (case-insensitive), sets it as default, and returns it. Returns null if no match is found.
     /// </summary>
-    public AudioDevice SetDefaultPlaybackByName(string nameSubstring, DefaultRole role = DefaultRole.MultimediaAndCommunications)
+    public AudioDevice SetDefaultPlaybackByName(string nameSubstring, DefaultRole roles = DefaultRole.Default)
     {
         AudioDevice match = FindByName(GetPlaybackDevices(), nameSubstring);
         if (match != null)
         {
-            SetDefaultDevice(match, role);
+            SetDefaultDevice(match, roles);
         }
 
         return match;
@@ -143,12 +143,12 @@ public sealed class AudioController
     /// Finds the first active recording endpoint whose name contains nameSubstring
     /// (case-insensitive), sets it as default, and returns it. Returns null if no match is found.
     /// </summary>
-    public AudioDevice SetDefaultRecordingByName(string nameSubstring, DefaultRole role = DefaultRole.MultimediaAndCommunications)
+    public AudioDevice SetDefaultRecordingByName(string nameSubstring, DefaultRole roles = DefaultRole.Default)
     {
         AudioDevice match = FindByName(GetRecordingDevices(), nameSubstring);
         if (match != null)
         {
-            SetDefaultDevice(match, role);
+            SetDefaultDevice(match, roles);
         }
 
         return match;

@@ -269,7 +269,7 @@ internal static class Program
 
     private static bool TryGetRole(Options o, out DefaultRole role)
     {
-        role = DefaultRole.MultimediaAndCommunications;
+        role = DefaultRole.Default;
 
         bool defaultOnly = o.Has("default-only");
         bool commOnly = o.Has("comm-only");
@@ -285,24 +285,40 @@ internal static class Program
 
         if (roleStr != null)
         {
-            switch (roleStr.ToLowerInvariant())
+            // --role accepts one or more flags combined with ',', '+', ';' or space,
+            // e.g. --role all, --role console+multimedia, --role "media,comm".
+            DefaultRole combined = 0;
+            foreach (string token in roleStr.Split(new[] { ',', '+', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries))
             {
-                case "default":
-                case "both":
-                    role = DefaultRole.MultimediaAndCommunications; break;
-                case "multimedia":
-                case "media":
-                    role = DefaultRole.Multimedia; break;
-                case "communications":
-                case "comm":
-                    role = DefaultRole.Communications; break;
-                case "all":
-                    role = DefaultRole.All; break;
-                default:
-                    Console.Error.WriteLine("Invalid --role: " + roleStr +
-                                            " (expected default|multimedia|communications|all)");
-                    return false;
+                switch (token.ToLowerInvariant())
+                {
+                    case "default":
+                    case "both":
+                        combined |= DefaultRole.Default; break;
+                    case "console":
+                        combined |= DefaultRole.Console; break;
+                    case "multimedia":
+                    case "media":
+                        combined |= DefaultRole.Multimedia; break;
+                    case "communications":
+                    case "comm":
+                        combined |= DefaultRole.Communications; break;
+                    case "all":
+                        combined |= DefaultRole.All; break;
+                    default:
+                        Console.Error.WriteLine("Invalid --role token: " + token +
+                                                " (expected console|multimedia|communications|default|all)");
+                        return false;
+                }
             }
+
+            if (combined == 0)
+            {
+                Console.Error.WriteLine("Invalid --role: no role specified.");
+                return false;
+            }
+
+            role = combined;
         }
 
         return true;
@@ -427,11 +443,12 @@ SELECTORS (for set / volume / mute - pick exactly one):
   --index <n>       Match by 1-based index shown in 'list'
   --recording       Scope --name/--index to recording devices (default: playback)
 
-ROLE (for set - which Windows default role to assign):
-  --role <r>        default | multimedia | communications | all   (default: default)
+ROLE (for set - which Windows default role(s) to assign; combinable flags):
+  --role <r>        one or more of: console | multimedia | communications | default | all
+                    combine with ',', '+' or space, e.g. --role console+multimedia
+                    (default: 'default' = multimedia + communications; 'all' adds console)
   --default-only    Alias for --role multimedia      (matches AudioDeviceCmdlets -DefaultOnly)
   --comm-only       Alias for --role communications   (matches -CommunicationOnly)
-                    'default' sets Multimedia + Communications; 'all' also sets Console.
 
 OPTIONS:
   list      [--playback | --recording]        (default: all)
@@ -448,6 +465,7 @@ EXAMPLES:
   " + Exe + @" set --name Speakers
   " + Exe + @" set --name Realtek --default-only
   " + Exe + @" set --index 3 --role all
+  " + Exe + @" set --name Speakers --role console+multimedia
   " + Exe + @" set --recording --name Microphone
   " + Exe + @" volume --name Speakers
   " + Exe + @" volume --name Speakers --set 50

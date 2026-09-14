@@ -1,6 +1,7 @@
 <Solution>
   <Project Path="Library/AudioDeviceLib.csproj" />
   <Folder Name="/Misc/">
+    <File Path=".github/workflows/publish.yml" />
     <File Path="Directory.Build.props" />
     <File Path="global.json" />
     <File Path="LICENSE" />

@@ -1,12 +1,12 @@
 # AudioDeviceLib
 
-A small, dependency-free **.NET 8** library for Windows that lists audio endpoints
+A small, dependency-free **.NET** library for Windows that lists audio endpoints
 and sets the default playback/recording device, plus volume and mute control.
 
 It replaces the need to host PowerShell and the third-party `AudioDeviceCmdlets`
 module: the same Core Audio (WASAPI) interop is called directly from managed code.
 
-- Target framework: `net8.0-windows`
+- Target frameworks: `net48`, `netstandard2.0`, `net8.0-windows`
 - No NuGet dependencies (pure COM interop).
 - Windows only.
 
@@ -48,8 +48,12 @@ AudioDevice set = audio.SetDefaultPlaybackByName("Speakers");
 if (set == null)
     Console.Error.WriteLine("No matching playback device found.");
 
-// Set a specific device you already resolved
-audio.SetDefaultDevice(current, DefaultRole.MultimediaAndCommunications);
+// Set a specific device you already resolved (default = Multimedia + Communications)
+audio.SetDefaultDevice(current);
+
+// Or pick exactly which Windows roles to assign (flags can be combined)
+audio.SetDefaultDevice(current, DefaultRole.Console | DefaultRole.Multimedia);
+audio.SetDefaultDevice(current, DefaultRole.All);
 
 // Volume / mute
 current.SetVolumePercent(50f);
@@ -58,17 +62,20 @@ current.IsMuted = false;
 
 ## Default-role semantics
 
-`DefaultRole` mirrors the `Set-AudioDevice` switches from AudioDeviceCmdlets:
+Windows tracks three independent default-device roles. `DefaultRole` is a `[Flags]`
+enum, so you can combine them; each set flag maps to one native `ERole` assignment.
 
-| Value | Roles set | Cmdlet equivalent |
-|-------|-----------|-------------------|
-| `MultimediaAndCommunications` (default) | Multimedia + Communications | no switch |
-| `Multimedia` | Multimedia only | `-DefaultOnly` |
-| `Communications` | Communications only | `-CommunicationOnly` |
-| `All` | Console + Multimedia + Communications | (not in cmdlet) |
+| Flag | Native role | Notes |
+|------|-------------|-------|
+| `Console` | `eConsole` | System sounds, games, voice commands |
+| `Multimedia` | `eMultimedia` | Music and movies. Matches `-DefaultOnly` |
+| `Communications` | `eCommunications` | Voice chat. Matches `-CommunicationOnly` |
+| `Default` (= `Multimedia \| Communications`) | both | The default; matches `Set-AudioDevice` with no switch |
+| `All` (= `Console \| Multimedia \| Communications`) | all three | Make this THE default for everything |
 
-Note: like the original cmdlet, the default value does **not** set the Console role.
-If some applications on your target follow the Console role, use `DefaultRole.All`.
+`SetDefaultDevice` defaults to `DefaultRole.Default`, which (like the original cmdlet)
+does **not** set the Console role. If some applications on your target follow the
+Console role, pass `DefaultRole.All` or include `DefaultRole.Console` in the combination.
 
 ## Notes for callers
 
