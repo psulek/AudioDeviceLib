@@ -18,11 +18,15 @@ public class PolicyConfigClient
     {
         _PolicyConfig = new _PolicyConfigClient() as IPolicyConfig;
         if (_PolicyConfig != null)
+        {
             return;
+        }
 
         _PolicyConfigVista = new _PolicyConfigClient() as IPolicyConfigVista;
         if (_PolicyConfigVista != null)
+        {
             return;
+        }
 
         _PolicyConfig10 = new _PolicyConfigClient() as IPolicyConfig10;
     }

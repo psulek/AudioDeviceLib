@@ -44,7 +44,9 @@ public sealed class AudioDevice
     internal AudioDevice(int index, MMDevice baseDevice, bool isDefault, bool isDefaultCommunication)
     {
         if (baseDevice == null)
+        {
             throw new ArgumentNullException(nameof(baseDevice));
+        }
 
         Index = index;
         IsDefault = isDefault;
@@ -64,8 +66,16 @@ public sealed class AudioDevice
     /// <summary>Sets master volume from a percentage in the range 0..100 (values are clamped).</summary>
     public void SetVolumePercent(float percent)
     {
-        if (percent < 0f) percent = 0f;
-        if (percent > 100f) percent = 100f;
+        if (percent < 0f)
+        {
+            percent = 0f;
+        }
+
+        if (percent > 100f)
+        {
+            percent = 100f;
+        }
+
         Device.AudioEndpointVolume.MasterVolumeLevelScalar = percent / 100f;
     }
 

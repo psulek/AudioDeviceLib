@@ -1,4 +1,11 @@
 <Solution>
   <Project Path="Library/AudioDeviceLib.csproj" />
+  <Folder Name="/Misc/">
+    <File Path="Directory.Build.props" />
+    <File Path="global.json" />
+    <File Path="LICENSE" />
+    <File Path="README.md" />
+    <File Path="THIRD-PARTY-NOTICES.md" />
+  </Folder>
   <Project Path="Library.Test/Library.Test.csproj" />
 </Solution>

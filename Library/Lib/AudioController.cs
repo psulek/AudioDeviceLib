@@ -83,14 +83,21 @@ public sealed class AudioController
     /// <summary>Sets the given device as the default for the requested role(s).</summary>
     public void SetDefaultDevice(AudioDevice device, DefaultRole role = DefaultRole.MultimediaAndCommunications)
     {
-        if (device == null) throw new ArgumentNullException(nameof(device));
+        if (device == null)
+        {
+            throw new ArgumentNullException(nameof(device));
+        }
+
         SetDefaultDevice(device.Id, role);
     }
 
     /// <summary>Sets the endpoint with the given ID as the default for the requested role(s).</summary>
     public void SetDefaultDevice(string deviceId, DefaultRole role = DefaultRole.MultimediaAndCommunications)
     {
-        if (string.IsNullOrEmpty(deviceId)) throw new ArgumentNullException(nameof(deviceId));
+        if (string.IsNullOrEmpty(deviceId))
+        {
+            throw new ArgumentNullException(nameof(deviceId));
+        }
 
         var client = new PolicyConfigClient();
         switch (role)
@@ -124,7 +131,11 @@ public sealed class AudioController
     public AudioDevice SetDefaultPlaybackByName(string nameSubstring, DefaultRole role = DefaultRole.MultimediaAndCommunications)
     {
         AudioDevice match = FindByName(GetPlaybackDevices(), nameSubstring);
-        if (match != null) SetDefaultDevice(match, role);
+        if (match != null)
+        {
+            SetDefaultDevice(match, role);
+        }
+
         return match;
     }
 
@@ -135,7 +146,11 @@ public sealed class AudioController
     public AudioDevice SetDefaultRecordingByName(string nameSubstring, DefaultRole role = DefaultRole.MultimediaAndCommunications)
     {
         AudioDevice match = FindByName(GetRecordingDevices(), nameSubstring);
-        if (match != null) SetDefaultDevice(match, role);
+        if (match != null)
+        {
+            SetDefaultDevice(match, role);
+        }
+
         return match;
     }
 
@@ -153,7 +168,10 @@ public sealed class AudioController
         {
             return null;
         }
-        if (mm == null) return null;
+        if (mm == null)
+        {
+            return null;
+        }
 
         // Locate it in the full enumeration so Index and the default flags are accurate.
         return GetDevices().FirstOrDefault(d => d.Id == mm.ID);
@@ -175,7 +193,11 @@ public sealed class AudioController
 
     private static AudioDevice FindByName(IEnumerable<AudioDevice> devices, string nameSubstring)
     {
-        if (string.IsNullOrEmpty(nameSubstring)) throw new ArgumentNullException(nameof(nameSubstring));
+        if (string.IsNullOrEmpty(nameSubstring))
+        {
+            throw new ArgumentNullException(nameof(nameSubstring));
+        }
+
         return devices.FirstOrDefault(d =>
             d.Name != null &&
             d.Name.IndexOf(nameSubstring, StringComparison.OrdinalIgnoreCase) >= 0);

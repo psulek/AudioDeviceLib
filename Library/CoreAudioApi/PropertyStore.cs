@@ -60,7 +60,9 @@ public class PropertyStore
         {
             PropertyKey key = Get(i);
             if (key.fmtid == guid)
+            {
                 return true;
+            }
         }
         return false;
     }
@@ -104,7 +106,9 @@ public class PropertyStore
         {
             PropertyKey key = Get(i);
             if (key.fmtid == compareKey.fmtid && key.pid == compareKey.pid)
+            {
                 return true;
+            }
         }
         return false;
     }

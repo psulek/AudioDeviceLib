@@ -54,9 +54,15 @@ public class AudioSessionControl
         IAudioMeterInformation _meters = realAudioSessionControl as IAudioMeterInformation;
         ISimpleAudioVolume _volume = realAudioSessionControl as ISimpleAudioVolume; 
         if (_meters != null)
+        {
             _AudioMeterInformation = new CoreAudioApi.AudioMeterInformation(_meters);
+        }
+
         if (_volume != null)
+        {
             _SimpleAudioVolume = new SimpleAudioVolume(_volume);
+        }
+
         _AudioSessionControl = realAudioSessionControl;
             
     }

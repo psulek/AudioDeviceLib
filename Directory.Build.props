@@ -1,0 +1,22 @@
+<Project>
+    <PropertyGroup>
+        <CopyrightYear>$([System.DateTime]::Now.ToString('yyyy'))</CopyrightYear>
+    </PropertyGroup>
+
+    <PropertyGroup>
+        <Authors>Peter Šulek</Authors>
+        <Copyright>Copyright © $(CopyrightYear) $(Authors). Portions (c) 2016-2022 Francois Gendron (MIT) and (c) 2007-2010 Ray Molenkamp (zlib-style).</Copyright>
+
+        <LangVersion>12.0</LangVersion>
+        <ImplicitUsings>disable</ImplicitUsings>
+
+        <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+
+        <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+        <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
+    </PropertyGroup>
+
+    <ItemGroup>
+		<SupportedOSPlatform Include="windows"/>
+	</ItemGroup>
+</Project>

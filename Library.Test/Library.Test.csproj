@@ -7,7 +7,7 @@
     <Nullable>disable</Nullable>
     <LangVersion>latest</LangVersion>
     <RootNamespace>AudioDeviceLib.Test</RootNamespace>
-    <AssemblyName>Library.Test</AssemblyName>
+    <AssemblyName>AudioDeviceLib.Test</AssemblyName>
     <SupportedOSPlatform>windows</SupportedOSPlatform>
   </PropertyGroup>
 

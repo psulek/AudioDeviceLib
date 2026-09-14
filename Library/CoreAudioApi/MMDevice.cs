@@ -81,7 +81,9 @@ public class MMDevice
         get
         {
             if (_AudioSessionManager == null)
+            {
                 GetAudioSessionManager();
+            }
 
             return _AudioSessionManager;
         }
@@ -92,7 +94,9 @@ public class MMDevice
         get
         {
             if (_AudioMeterInformation == null)
+            {
                 GetAudioMeterInformation();
+            }
 
             return _AudioMeterInformation;
         }
@@ -103,7 +107,9 @@ public class MMDevice
         get
         {
             if (_AudioEndpointVolume == null)
+            {
                 GetAudioEndpointVolume();
+            }
 
             return _AudioEndpointVolume;
         }
@@ -114,7 +120,10 @@ public class MMDevice
         get
         {
             if (_PropertyStore == null)
+            {
                 GetPropertyInformation();
+            }
+
             return _PropertyStore;
         }
     }
@@ -124,13 +133,18 @@ public class MMDevice
         get
         {
             if (_PropertyStore == null)
+            {
                 GetPropertyInformation();
+            }
+
             if (_PropertyStore.Contains(PKEY.PKEY_DeviceInterface_FriendlyName))
             {
                 return (string)_PropertyStore[PKEY.PKEY_DeviceInterface_FriendlyName].Value;
             }
             else
+            {
                 return "Unknown";
+            }
         }
     }
 
