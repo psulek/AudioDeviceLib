@@ -26,6 +26,7 @@ using AudioDeviceLib.CoreAudioApi.Interfaces;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
+/// <summary>Volume control for a single channel of an audio endpoint.</summary>
 public class AudioEndpointVolumeChannel
 {
     private uint _Channel;
@@ -37,6 +38,8 @@ public class AudioEndpointVolumeChannel
         _AudioEndpointVolume = parent;
     }
 
+    /// <summary>Gets or sets this channel's volume level in decibels, within the endpoint's volume range.</summary>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public float VolumeLevel
     {
         get
@@ -45,12 +48,11 @@ public class AudioEndpointVolumeChannel
             Marshal.ThrowExceptionForHR(_AudioEndpointVolume.GetChannelVolumeLevel(_Channel,out result));
             return result;
         }
-        set
-        {
-            Marshal.ThrowExceptionForHR(_AudioEndpointVolume.SetChannelVolumeLevel(_Channel, value,Guid.Empty));
-        }
+        set => Marshal.ThrowExceptionForHR(_AudioEndpointVolume.SetChannelVolumeLevel(_Channel, value,Guid.Empty));
     }
 
+    /// <summary>Gets or sets this channel's volume as a normalized scalar in the range 0.0 to 1.0.</summary>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public float VolumeLevelScalar
     {
         get
@@ -59,10 +61,7 @@ public class AudioEndpointVolumeChannel
             Marshal.ThrowExceptionForHR(_AudioEndpointVolume.GetChannelVolumeLevelScalar(_Channel, out result));
             return result;
         }
-        set
-        {
-            Marshal.ThrowExceptionForHR(_AudioEndpointVolume.SetChannelVolumeLevelScalar(_Channel, value, Guid.Empty));
-        }
+        set => Marshal.ThrowExceptionForHR(_AudioEndpointVolume.SetChannelVolumeLevelScalar(_Channel, value, Guid.Empty));
     }
 
 }

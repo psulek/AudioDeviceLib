@@ -26,29 +26,22 @@ using AudioDeviceLib.CoreAudioApi.Interfaces;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
+/// <summary>
+/// Managed wrapper over the Core Audio <c>IAudioSessionControl2</c> interface. Represents a single
+/// audio session (typically one application) and exposes its state, metadata and volume controls.
+/// </summary>
 public class AudioSessionControl 
 {
     internal IAudioSessionControl2 _AudioSessionControl;
     internal AudioMeterInformation _AudioMeterInformation;
     internal SimpleAudioVolume _SimpleAudioVolume;
 
-    public AudioMeterInformation AudioMeterInformation
-    {
-        get
-        {
-            return _AudioMeterInformation;
-        }
-    }
+    /// <summary>Gets the peak-meter information for this session, or <c>null</c> if unsupported.</summary>
+    public AudioMeterInformation AudioMeterInformation => _AudioMeterInformation;
 
-    public SimpleAudioVolume SimpleAudioVolume
-    {
-        get
-        {
-            return _SimpleAudioVolume;
-        }
-    }
-
-
+    /// <summary>Gets the simple (per-session) volume and mute control, or <c>null</c> if unsupported.</summary>
+    public SimpleAudioVolume SimpleAudioVolume => _SimpleAudioVolume;
+    
     internal AudioSessionControl(IAudioSessionControl2 realAudioSessionControl)
     {
         IAudioMeterInformation _meters = realAudioSessionControl as IAudioMeterInformation;
@@ -64,19 +57,26 @@ public class AudioSessionControl
         }
 
         _AudioSessionControl = realAudioSessionControl;
-            
     }
 
+    /// <summary>Registers a callback to receive session change notifications.</summary>
+    /// <param name="eventConsumer">The consumer that will receive <c>IAudioSessionEvents</c> callbacks.</param>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public void RegisterAudioSessionNotification(IAudioSessionEvents eventConsumer)
     {
         Marshal.ThrowExceptionForHR(_AudioSessionControl.RegisterAudioSessionNotification(eventConsumer));
     }
 
+    /// <summary>Unregisters a previously registered session change callback.</summary>
+    /// <param name="eventConsumer">The consumer that was passed to <see cref="RegisterAudioSessionNotification"/>.</param>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public void UnregisterAudioSessionNotification(IAudioSessionEvents eventConsumer)
     {
         Marshal.ThrowExceptionForHR(_AudioSessionControl.UnregisterAudioSessionNotification(eventConsumer));
     }
 
+    /// <summary>Gets the current activity state of the session (inactive, active or expired).</summary>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public AudioSessionState State
     {
         get
@@ -87,6 +87,8 @@ public class AudioSessionControl
         }
     }
 
+    /// <summary>Gets the display name reported by the session, if any.</summary>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public string DisplayName
     {
         get
@@ -99,6 +101,8 @@ public class AudioSessionControl
         }
     }
 
+    /// <summary>Gets the path of the icon reported by the session, if any.</summary>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public string IconPath
     {
         get
@@ -111,6 +115,8 @@ public class AudioSessionControl
         }
     }
 
+    /// <summary>Gets the session identifier string, shared by all instances of the same session.</summary>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public string SessionIdentifier
     {
         get
@@ -123,6 +129,8 @@ public class AudioSessionControl
         }
     }
 
+    /// <summary>Gets the identifier that uniquely distinguishes this session instance.</summary>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public string SessionInstanceIdentifier
     {
         get
@@ -135,6 +143,8 @@ public class AudioSessionControl
         }
     }
 
+    /// <summary>Gets the process identifier (PID) that owns the session.</summary>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public uint ProcessID
     {
         get
@@ -145,14 +155,6 @@ public class AudioSessionControl
         }
     }
 
-    public bool IsSystemIsSystemSoundsSession
-    {
-        get
-        {
-            return (_AudioSessionControl.IsSystemSoundsSession() == 0);  //S_OK
-        }
-
-    }
-
-
+    /// <summary>Gets a value indicating whether this session is the reserved system-sounds session.</summary>
+    public bool IsSystemIsSystemSoundsSession => (_AudioSessionControl.IsSystemSoundsSession() == 0); //S_OK
 }

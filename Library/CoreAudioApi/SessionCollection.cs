@@ -25,6 +25,7 @@ using AudioDeviceLib.CoreAudioApi.Interfaces;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
+/// <summary>A collection of the <see cref="AudioSessionControl"/> sessions on an audio endpoint.</summary>
 public class SessionCollection
 {
     IAudioSessionEnumerator _AudioSessionEnumerator;
@@ -33,6 +34,10 @@ public class SessionCollection
         _AudioSessionEnumerator = realEnumerator;
     }
 
+    /// <summary>Gets the session at the specified zero-based index.</summary>
+    /// <param name="index">The zero-based index of the session (0 to <see cref="Count"/> - 1).</param>
+    /// <returns>The <see cref="AudioSessionControl"/> at the requested position.</returns>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public AudioSessionControl this[int index]
     {
         get
@@ -43,6 +48,8 @@ public class SessionCollection
         }
     }
 
+    /// <summary>Gets the number of sessions in the collection.</summary>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public int Count
     {
         get

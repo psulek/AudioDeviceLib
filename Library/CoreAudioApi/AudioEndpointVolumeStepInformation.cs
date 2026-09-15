@@ -25,6 +25,7 @@ using AudioDeviceLib.CoreAudioApi.Interfaces;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
+/// <summary>Describes the discrete volume steps available on an audio endpoint.</summary>
 public class AudioEndpointVolumeStepInformation
 {
     private uint _Step;
@@ -34,20 +35,9 @@ public class AudioEndpointVolumeStepInformation
         Marshal.ThrowExceptionForHR(parent.GetVolumeStepInfo(out _Step, out _StepCount));
     }
 
-    public uint Step
-    {
-        get
-        {
-            return _Step;
-        }
-    }
+    /// <summary>Gets the current, zero-based volume step index.</summary>
+    public uint Step => _Step;
 
-    public uint StepCount
-    {
-        get
-        {
-            return _StepCount;
-        }
-    }
-
+    /// <summary>Gets the total number of volume steps supported by the endpoint.</summary>
+    public uint StepCount => _StepCount;
 }

@@ -22,6 +22,7 @@
 
 namespace AudioDeviceLib.CoreAudioApi;
 
+/// <summary>A single key/value entry read from a Core Audio <see cref="PropertyStore"/>.</summary>
 public class PropertyStoreProperty
 {
     private PropertyKey _PropertyKey;
@@ -33,19 +34,9 @@ public class PropertyStoreProperty
         _PropValue = value;
     }
 
-    public PropertyKey Key
-    {
-        get
-        {
-            return _PropertyKey;
-        }
-    }
+    /// <summary>Gets the key that identifies this property.</summary>
+    public PropertyKey Key => _PropertyKey;
 
-    public object Value
-    {
-        get
-        {
-            return _PropValue.Value;
-        }
-    }
+    /// <summary>Gets the property value, converted to a managed type where supported.</summary>
+    public object Value => _PropValue.Value;
 }

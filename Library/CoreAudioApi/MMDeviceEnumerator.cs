@@ -33,10 +33,19 @@ internal class _MMDeviceEnumerator
 }
 
 //Small wrapper class
+/// <summary>
+/// Managed wrapper over the Core Audio <c>IMMDeviceEnumerator</c>. Enumerates audio endpoints and
+/// resolves default devices. Windows Vista or newer is required.
+/// </summary>
 public class MMDeviceEnumerator 
 {
     private IMMDeviceEnumerator _realEnumerator = new _MMDeviceEnumerator() as IMMDeviceEnumerator;
 
+    /// <summary>Enumerates the audio endpoints that match the given data flow and state mask.</summary>
+    /// <param name="dataFlow">The data-flow direction to enumerate (render, capture or all).</param>
+    /// <param name="dwStateMask">A bit mask of device states to include (e.g. active, disabled, unplugged).</param>
+    /// <returns>An <see cref="MMDeviceCollection"/> of the matching endpoints.</returns>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public MMDeviceCollection EnumerateAudioEndPoints(EDataFlow dataFlow, EDeviceState dwStateMask)
     {
         IMMDeviceCollection result;
@@ -44,6 +53,11 @@ public class MMDeviceEnumerator
         return new MMDeviceCollection(result);
     }
 
+    /// <summary>Gets the current default endpoint for the given data flow and role.</summary>
+    /// <param name="dataFlow">The data-flow direction (render or capture).</param>
+    /// <param name="role">The device role (console, multimedia or communications).</param>
+    /// <returns>The default <see cref="MMDevice"/> for the requested flow and role.</returns>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when no default endpoint exists or the underlying Core Audio call fails.</exception>
     public MMDevice GetDefaultAudioEndpoint(EDataFlow dataFlow, ERole role)
     {
         IMMDevice _Device = null;
@@ -51,6 +65,10 @@ public class MMDeviceEnumerator
         return new MMDevice(_Device);
     }
 
+    /// <summary>Gets a specific endpoint by its Core Audio device ID.</summary>
+    /// <param name="ID">The endpoint ID string returned by <see cref="MMDevice.ID"/>.</param>
+    /// <returns>The <see cref="MMDevice"/> identified by <paramref name="ID"/>.</returns>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the ID is unknown or the underlying Core Audio call fails.</exception>
     public MMDevice GetDevice(string ID)
     {
         IMMDevice _Device = null;
@@ -58,6 +76,8 @@ public class MMDeviceEnumerator
         return new MMDevice(_Device);
     }
 
+    /// <summary>Creates a new enumerator instance.</summary>
+    /// <exception cref="NotSupportedException">Thrown on Windows versions older than Vista.</exception>
     public MMDeviceEnumerator()
     {
         if (System.Environment.OSVersion.Version.Major < 6)

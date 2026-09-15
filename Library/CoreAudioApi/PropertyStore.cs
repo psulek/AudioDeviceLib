@@ -33,6 +33,8 @@ public class PropertyStore
 {
     private IPropertyStore _Store;
 
+    /// <summary>Gets the number of properties in the store.</summary>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public int Count
     {
         get
@@ -43,6 +45,10 @@ public class PropertyStore
         }
     }
 
+    /// <summary>Gets the property at the specified zero-based index.</summary>
+    /// <param name="index">The zero-based property index (0 to <see cref="Count"/> - 1).</param>
+    /// <returns>The <see cref="PropertyStoreProperty"/> at the requested position.</returns>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public PropertyStoreProperty this[int index]
     {
         get
@@ -54,6 +60,9 @@ public class PropertyStore
         }
     }
 
+    /// <summary>Determines whether the store contains any property from the given property set.</summary>
+    /// <param name="guid">The format identifier (GUID) of the property set to look for.</param>
+    /// <returns><c>true</c> if a property with the matching set GUID exists; otherwise <c>false</c>.</returns>
     public bool Contains(Guid guid)
     {
         for (int i = 0; i < Count; i++)
@@ -67,6 +76,10 @@ public class PropertyStore
         return false;
     }
 
+    /// <summary>Gets the first property whose property set matches the given GUID.</summary>
+    /// <param name="guid">The format identifier (GUID) of the property set to look up.</param>
+    /// <returns>The matching <see cref="PropertyStoreProperty"/>, or <c>null</c> if none is found.</returns>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public PropertyStoreProperty this[Guid guid]
     {
         get
@@ -85,6 +98,10 @@ public class PropertyStore
         }
     }
 
+    /// <summary>Gets the property key at the specified zero-based index.</summary>
+    /// <param name="index">The zero-based property index (0 to <see cref="Count"/> - 1).</param>
+    /// <returns>The <see cref="PropertyKey"/> at the requested position.</returns>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public PropertyKey Get(int index)
     {
         PropertyKey key;
@@ -92,6 +109,10 @@ public class PropertyStore
         return key;
     }
 
+    /// <summary>Gets the raw property value at the specified zero-based index.</summary>
+    /// <param name="index">The zero-based property index (0 to <see cref="Count"/> - 1).</param>
+    /// <returns>The <see cref="PropVariant"/> value at the requested position.</returns>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public PropVariant GetValue(int index)
     {
         PropVariant result;
@@ -100,6 +121,9 @@ public class PropertyStore
         return result;
     }
 
+    /// <summary>Determines whether the store contains a property matching the given key exactly.</summary>
+    /// <param name="compareKey">The property key (set GUID and property id) to look for.</param>
+    /// <returns><c>true</c> if a matching property exists; otherwise <c>false</c>.</returns>
     public bool Contains(PropertyKey compareKey)
     {
         for (int i = 0; i < Count; i++)
@@ -113,6 +137,10 @@ public class PropertyStore
         return false;
     }
 
+    /// <summary>Gets the property that matches the given key exactly.</summary>
+    /// <param name="queryKey">The property key (set GUID and property id) to look up.</param>
+    /// <returns>The matching <see cref="PropertyStoreProperty"/>, or <c>null</c> if none is found.</returns>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public PropertyStoreProperty this[PropertyKey queryKey]
     {
         get

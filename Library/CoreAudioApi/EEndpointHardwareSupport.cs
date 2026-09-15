@@ -24,10 +24,16 @@ using System;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
+/// <summary>Bit flags describing which functions an endpoint supports in hardware, matching the native <c>ENDPOINT_HARDWARE_SUPPORT_*</c> constants.</summary>
 [Flags]
 public enum EEndpointHardwareSupport
 {
+    /// <summary>The endpoint supports a hardware volume control.</summary>
     Volume = 0x00000001,
+
+    /// <summary>The endpoint supports a hardware mute control.</summary>
     Mute   = 0x00000002,
+
+    /// <summary>The endpoint supports a hardware peak meter.</summary>
     Meter  = 0x00000004
 }

@@ -25,10 +25,14 @@ using AudioDeviceLib.CoreAudioApi.Interfaces;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
+/// <summary>The collection of per-channel volume controls for an audio endpoint.</summary>
 public class AudioEndpointVolumeChannels
 {
     IAudioEndpointVolume _AudioEndPointVolume;
     AudioEndpointVolumeChannel[] _Channels;
+
+    /// <summary>Gets the number of channels exposed by the endpoint.</summary>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public int Count
     {
         get
@@ -39,13 +43,10 @@ public class AudioEndpointVolumeChannels
         }
     }
 
-    public AudioEndpointVolumeChannel this[int index]
-    {
-        get
-        {
-            return _Channels[index];
-        }
-    }
+    /// <summary>Gets the volume control for the channel at the specified zero-based index.</summary>
+    /// <param name="index">The zero-based channel index (0 to <see cref="Count"/> - 1).</param>
+    /// <returns>The <see cref="AudioEndpointVolumeChannel"/> at the requested position.</returns>
+    public AudioEndpointVolumeChannel this[int index] => _Channels[index];
 
     internal AudioEndpointVolumeChannels(IAudioEndpointVolume parent)
     {

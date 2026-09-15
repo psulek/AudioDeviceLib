@@ -8,12 +8,18 @@ internal class _PolicyConfigClient
 {
 }
 
+/// <summary>
+/// Managed wrapper over the undocumented Core Audio <c>IPolicyConfig</c> family of interfaces.
+/// Used to change the default audio endpoint. Automatically selects the interface variant
+/// supported by the running Windows version.
+/// </summary>
 public class PolicyConfigClient
 {
     private readonly IPolicyConfig _PolicyConfig;
     private readonly IPolicyConfigVista _PolicyConfigVista;
     private readonly IPolicyConfig10 _PolicyConfig10;
 
+    /// <summary>Creates a client bound to the <c>IPolicyConfig</c> variant supported by the current OS.</summary>
     public PolicyConfigClient()
     {
         _PolicyConfig = new _PolicyConfigClient() as IPolicyConfig;
@@ -31,6 +37,10 @@ public class PolicyConfigClient
         _PolicyConfig10 = new _PolicyConfigClient() as IPolicyConfig10;
     }
 
+    /// <summary>Sets the endpoint with the given ID as the default device for the specified role.</summary>
+    /// <param name="devID">The Core Audio endpoint ID to make default.</param>
+    /// <param name="eRole">The role (console, multimedia or communications) to assign.</param>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying policy-config call fails.</exception>
     public void SetDefaultEndpoint(string devID, ERole eRole)
     {
         if (_PolicyConfig != null)

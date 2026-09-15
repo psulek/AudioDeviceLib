@@ -25,6 +25,10 @@ using AudioDeviceLib.CoreAudioApi.Interfaces;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
+/// <summary>
+/// Managed wrapper over the Core Audio <c>IAudioSessionManager2</c> interface. Provides access to
+/// the collection of audio sessions on an endpoint.
+/// </summary>
 public class AudioSessionManager
 {
     private IAudioSessionManager2 _AudioSessionManager;
@@ -38,12 +42,6 @@ public class AudioSessionManager
         _Sessions = new SessionCollection(_SessionEnum);
     }
 
-    public SessionCollection Sessions
-    {
-        get
-        {
-            return _Sessions;
-        }
-    }
-
+    /// <summary>Gets the collection of audio sessions currently associated with the endpoint.</summary>
+    public SessionCollection Sessions => _Sessions;
 }

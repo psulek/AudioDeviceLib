@@ -25,10 +25,13 @@ using AudioDeviceLib.CoreAudioApi.Interfaces;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
+/// <summary>The collection of per-channel peak meter values for an audio endpoint.</summary>
 public class AudioMeterInformationChannels
 {
     IAudioMeterInformation _AudioMeterInformation;
 
+    /// <summary>Gets the number of metering channels exposed by the endpoint.</summary>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public int Count
     {
         get
@@ -39,6 +42,10 @@ public class AudioMeterInformationChannels
         }
     }
 
+    /// <summary>Gets the current peak value for the channel at the specified zero-based index.</summary>
+    /// <param name="index">The zero-based channel index (0 to <see cref="Count"/> - 1).</param>
+    /// <returns>The peak sample value for the channel, in the range 0.0 to 1.0.</returns>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public float this[int index]
     {
         get

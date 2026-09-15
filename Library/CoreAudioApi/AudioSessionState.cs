@@ -22,9 +22,15 @@
 
 namespace AudioDeviceLib.CoreAudioApi;
 
+/// <summary>The activity state of an audio session, matching the native <c>AudioSessionState</c>.</summary>
 public enum AudioSessionState
 {
+    /// <summary>The session is inactive (has no active audio streams).</summary>
     AudioSessionStateInactive = 0,
+
+    /// <summary>The session is active (has one or more active audio streams).</summary>
     AudioSessionStateActive = 1,
+
+    /// <summary>The session has expired (all associated streams have been released).</summary>
     AudioSessionStateExpired = 2
 }

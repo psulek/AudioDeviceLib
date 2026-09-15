@@ -24,8 +24,12 @@ using System;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
+/// <summary>Identifies a single property in a Core Audio property store (the native <c>PROPERTYKEY</c>).</summary>
 public struct PropertyKey
 {
+    /// <summary>The format identifier (GUID) of the property set the property belongs to.</summary>
     public Guid fmtid;
+
+    /// <summary>The property identifier within the property set identified by <see cref="fmtid"/>.</summary>
     public int pid;
 };

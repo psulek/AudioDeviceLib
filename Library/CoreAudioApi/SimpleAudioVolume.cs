@@ -26,6 +26,10 @@ using AudioDeviceLib.CoreAudioApi.Interfaces;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
+/// <summary>
+/// Managed wrapper over the Core Audio <c>ISimpleAudioVolume</c> interface. Provides per-session
+/// master volume and mute control.
+/// </summary>
 public class SimpleAudioVolume
 {
     ISimpleAudioVolume _SimpleAudioVolume;
@@ -34,6 +38,8 @@ public class SimpleAudioVolume
         _SimpleAudioVolume = realSimpleVolume;
     }
 
+    /// <summary>Gets or sets the session master volume as a normalized scalar in the range 0.0 to 1.0.</summary>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public float MasterVolume
     {
         get
@@ -49,6 +55,8 @@ public class SimpleAudioVolume
         }
     }
 
+    /// <summary>Gets or sets the mute state of the session.</summary>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public bool Mute
     {
         get

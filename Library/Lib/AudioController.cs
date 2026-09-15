@@ -29,6 +29,11 @@ public sealed class AudioController
     // ---- Enumeration --------------------------------------------------------------
 
     /// <summary>Returns all active endpoints (both playback and recording), in enumeration order.</summary>
+    /// <returns>
+    /// A read-only list of all active <see cref="AudioDevice"/> endpoints. Each device is tagged with
+    /// its 1-based <see cref="AudioDevice.Index"/> and whether it is the current default / default
+    /// communications device. The list is empty if no active endpoints exist.
+    /// </returns>
     public IReadOnlyList<AudioDevice> GetDevices()
     {
         MMDeviceCollection collection = _enumerator.EnumerateAudioEndPoints(EDataFlow.eAll, EDeviceState.DEVICE_STATE_ACTIVE);
@@ -53,12 +58,20 @@ public sealed class AudioController
     }
 
     /// <summary>Returns all active playback (render) endpoints.</summary>
+    /// <returns>
+    /// A read-only list of the active endpoints whose <see cref="AudioDevice.Kind"/> is
+    /// <see cref="AudioDeviceKind.Playback"/>. The list is empty if no playback endpoints are active.
+    /// </returns>
     public IReadOnlyList<AudioDevice> GetPlaybackDevices()
     {
         return GetDevices().Where(d => d.Kind == AudioDeviceKind.Playback).ToList();
     }
 
     /// <summary>Returns all active recording (capture) endpoints.</summary>
+    /// <returns>
+    /// A read-only list of the active endpoints whose <see cref="AudioDevice.Kind"/> is
+    /// <see cref="AudioDeviceKind.Recording"/>. The list is empty if no recording endpoints are active.
+    /// </returns>
     public IReadOnlyList<AudioDevice> GetRecordingDevices()
     {
         return GetDevices().Where(d => d.Kind == AudioDeviceKind.Recording).ToList();
@@ -67,12 +80,28 @@ public sealed class AudioController
     // ---- Current defaults ---------------------------------------------------------
 
     /// <summary>Returns the current default playback device, or null if none is set.</summary>
+    /// <param name="communications">
+    /// When <c>true</c>, resolves the default for the communications role (voice chat); when
+    /// <c>false</c> (the default), resolves the default for the multimedia role (music, movies).
+    /// </param>
+    /// <returns>
+    /// The default playback <see cref="AudioDevice"/> for the requested role, or <c>null</c> if no
+    /// default playback device is currently set.
+    /// </returns>
     public AudioDevice GetDefaultPlaybackDevice(bool communications = false)
     {
         return GetDefault(EDataFlow.eRender, communications);
     }
 
     /// <summary>Returns the current default recording device, or null if none is set.</summary>
+    /// <param name="communications">
+    /// When <c>true</c>, resolves the default for the communications role (voice chat); when
+    /// <c>false</c> (the default), resolves the default for the multimedia role.
+    /// </param>
+    /// <returns>
+    /// The default recording <see cref="AudioDevice"/> for the requested role, or <c>null</c> if no
+    /// default recording device is currently set.
+    /// </returns>
     public AudioDevice GetDefaultRecordingDevice(bool communications = false)
     {
         return GetDefault(EDataFlow.eCapture, communications);
@@ -81,6 +110,13 @@ public sealed class AudioController
     // ---- Setting the default ------------------------------------------------------
 
     /// <summary>Sets the given device as the default for the requested role(s).</summary>
+    /// <param name="device">The endpoint to make default. Must not be <c>null</c>.</param>
+    /// <param name="roles">
+    /// The role(s) to assign. Defaults to <see cref="DefaultRole.Default"/> (multimedia + communications).
+    /// Each set flag maps to one native <c>ERole</c> call.
+    /// </param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="device"/> is <c>null</c>.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="roles"/> specifies no role.</exception>
     public void SetDefaultDevice(AudioDevice device, DefaultRole roles = DefaultRole.Default)
     {
         if (device == null)
@@ -95,6 +131,14 @@ public sealed class AudioController
     /// Sets the endpoint with the given ID as the default for the requested role(s).
     /// <paramref name="roles"/> is a bit flag; each set flag maps to one native ERole call.
     /// </summary>
+    /// <param name="deviceId">The endpoint ID to make default. Must not be <c>null</c> or empty.</param>
+    /// <param name="roles">
+    /// The role(s) to assign. Defaults to <see cref="DefaultRole.Default"/> (multimedia + communications).
+    /// At least one of <see cref="DefaultRole.Console"/>, <see cref="DefaultRole.Multimedia"/> or
+    /// <see cref="DefaultRole.Communications"/> must be set.
+    /// </param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="deviceId"/> is <c>null</c> or empty.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="roles"/> specifies no role.</exception>
     public void SetDefaultDevice(string deviceId, DefaultRole roles = DefaultRole.Default)
     {
         if (string.IsNullOrEmpty(deviceId))
@@ -128,6 +172,16 @@ public sealed class AudioController
     /// Finds the first active playback endpoint whose name contains nameSubstring
     /// (case-insensitive), sets it as default, and returns it. Returns null if no match is found.
     /// </summary>
+    /// <param name="nameSubstring">
+    /// The substring to match against each endpoint's <see cref="AudioDevice.Name"/> (case-insensitive).
+    /// Must not be <c>null</c> or empty.
+    /// </param>
+    /// <param name="roles">
+    /// The role(s) to assign to the matched device. Defaults to <see cref="DefaultRole.Default"/>.
+    /// </param>
+    /// <returns>The matched <see cref="AudioDevice"/> that was set as default, or <c>null</c> if no endpoint matched.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="nameSubstring"/> is <c>null</c> or empty.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="roles"/> specifies no role.</exception>
     public AudioDevice SetDefaultPlaybackByName(string nameSubstring, DefaultRole roles = DefaultRole.Default)
     {
         AudioDevice match = FindByName(GetPlaybackDevices(), nameSubstring);
@@ -143,6 +197,16 @@ public sealed class AudioController
     /// Finds the first active recording endpoint whose name contains nameSubstring
     /// (case-insensitive), sets it as default, and returns it. Returns null if no match is found.
     /// </summary>
+    /// <param name="nameSubstring">
+    /// The substring to match against each endpoint's <see cref="AudioDevice.Name"/> (case-insensitive).
+    /// Must not be <c>null</c> or empty.
+    /// </param>
+    /// <param name="roles">
+    /// The role(s) to assign to the matched device. Defaults to <see cref="DefaultRole.Default"/>.
+    /// </param>
+    /// <returns>The matched <see cref="AudioDevice"/> that was set as default, or <c>null</c> if no endpoint matched.</returns>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="nameSubstring"/> is <c>null</c> or empty.</exception>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="roles"/> specifies no role.</exception>
     public AudioDevice SetDefaultRecordingByName(string nameSubstring, DefaultRole roles = DefaultRole.Default)
     {
         AudioDevice match = FindByName(GetRecordingDevices(), nameSubstring);

@@ -25,6 +25,10 @@ using AudioDeviceLib.CoreAudioApi.Interfaces;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
+/// <summary>
+/// Managed wrapper over the Core Audio <c>IAudioMeterInformation</c> interface. Exposes the
+/// current peak sample values (master and per-channel) for an audio endpoint.
+/// </summary>
 public class AudioMeterInformation
 {
     private IAudioMeterInformation _AudioMeterInformation;
@@ -42,22 +46,14 @@ public class AudioMeterInformation
 
     }
 
-    public AudioMeterInformationChannels PeakValues
-    {
-        get
-        {
-            return _Channels;
-        }
-    }
+    /// <summary>Gets the collection of per-channel peak meter values.</summary>
+    public AudioMeterInformationChannels PeakValues => _Channels;
 
-    public EEndpointHardwareSupport HardwareSupport
-    {
-        get
-        {
-            return _HardwareSupport;
-        }
-    }
+    /// <summary>Gets the hardware functions (volume, mute, meter) natively supported by the endpoint.</summary>
+    public EEndpointHardwareSupport HardwareSupport => _HardwareSupport;
 
+    /// <summary>Gets the current master peak sample value in the range 0.0 to 1.0.</summary>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public float MasterPeakValue
     {
         get

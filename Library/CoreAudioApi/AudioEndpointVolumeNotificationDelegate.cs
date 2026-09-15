@@ -22,4 +22,6 @@
 
 namespace AudioDeviceLib.CoreAudioApi;
 
+/// <summary>Handles endpoint volume-change notifications raised by <see cref="AudioEndpointVolume.OnVolumeNotification"/>.</summary>
+/// <param name="data">A snapshot of the endpoint's volume and mute state at the time of the change.</param>
 public delegate void AudioEndpointVolumeNotificationDelegate( AudioVolumeNotificationData data);

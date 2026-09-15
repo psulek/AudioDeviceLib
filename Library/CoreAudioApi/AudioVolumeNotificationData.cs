@@ -24,6 +24,7 @@ using System;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
+/// <summary>Immutable snapshot of an endpoint's volume state delivered with a volume-change notification.</summary>
 public class AudioVolumeNotificationData
 {
     private Guid _EventContext;
@@ -32,44 +33,26 @@ public class AudioVolumeNotificationData
     private int _Channels;
     private float[] _ChannelVolume;
 
-    public Guid EventContext
-    {
-        get
-        {
-            return _EventContext;
-        }
-    }
+    /// <summary>Gets the context GUID identifying the caller that triggered the change, if any.</summary>
+    public Guid EventContext => _EventContext;
 
-    public bool Muted
-    {
-        get
-        {
-            return _Muted;
-        }
-    }
+    /// <summary>Gets a value indicating whether the endpoint is muted.</summary>
+    public bool Muted => _Muted;
 
-    public float MasterVolume
-    {
-        get
-        {
-            return _MasterVolume;
-        }
-    }
-    public int Channels
-    {
-        get
-        {
-            return _Channels;
-        }
-    }
+    /// <summary>Gets the master volume as a normalized scalar in the range 0.0 to 1.0.</summary>
+    public float MasterVolume => _MasterVolume;
 
-    public float[] ChannelVolume
-    {
-        get
-        {
-            return _ChannelVolume;
-        }
-    }
+    /// <summary>Gets the number of channels reported in <see cref="ChannelVolume"/>.</summary>
+    public int Channels => _Channels;
+
+    /// <summary>Gets the per-channel volume scalars, each in the range 0.0 to 1.0.</summary>
+    public float[] ChannelVolume => _ChannelVolume;
+
+    /// <summary>Creates a new volume notification data snapshot.</summary>
+    /// <param name="eventContext">The context GUID of the caller that triggered the change.</param>
+    /// <param name="muted">Whether the endpoint is muted.</param>
+    /// <param name="masterVolume">The master volume scalar in the range 0.0 to 1.0.</param>
+    /// <param name="channelVolume">The per-channel volume scalars; its length determines <see cref="Channels"/>.</param>
     public AudioVolumeNotificationData(Guid eventContext, bool muted, float masterVolume, float[] channelVolume)
     {
         _EventContext = eventContext;

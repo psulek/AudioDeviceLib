@@ -26,6 +26,7 @@ using AudioDeviceLib.CoreAudioApi.Interfaces;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
+/// <summary>Managed layout of the native <c>PROPVARIANT</c> used to read values from a property store.</summary>
 [StructLayout(LayoutKind.Explicit)]
 public struct PropVariant
 {
@@ -61,6 +62,11 @@ public struct PropVariant
         return Result;
     }
 
+    /// <summary>Gets the variant value converted to a managed object based on its variant type.</summary>
+    /// <returns>
+    /// The value as a managed type for supported variant types (integers, string, blob), or a
+    /// diagnostic string for variant types that are not yet handled.
+    /// </returns>
     public object Value
     {
         get

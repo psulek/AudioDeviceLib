@@ -25,6 +25,7 @@ using AudioDeviceLib.CoreAudioApi.Interfaces;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
+/// <summary>Describes the supported volume range of an audio endpoint, in decibels.</summary>
 public class AudioEndPointVolumeVolumeRange
 {
     float _VolumeMindB;
@@ -36,27 +37,12 @@ public class AudioEndPointVolumeVolumeRange
         Marshal.ThrowExceptionForHR(parent.GetVolumeRange(out _VolumeMindB,out _VolumeMaxdB,out _VolumeIncrementdB));
     }
 
-    public float MindB
-    {
-        get
-        {
-            return _VolumeMindB;
-        }
-    }
+    /// <summary>Gets the minimum supported volume level, in decibels.</summary>
+    public float MindB => _VolumeMindB;
 
-    public float MaxdB
-    {
-        get
-        {
-            return _VolumeMaxdB;
-        }
-    }
+    /// <summary>Gets the maximum supported volume level, in decibels.</summary>
+    public float MaxdB => _VolumeMaxdB;
 
-    public float IncrementdB
-    {
-        get
-        {
-            return _VolumeIncrementdB;
-        }
-    }
+    /// <summary>Gets the volume increment between consecutive steps, in decibels.</summary>
+    public float IncrementdB => _VolumeIncrementdB;
 }

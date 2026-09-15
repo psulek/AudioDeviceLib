@@ -58,12 +58,17 @@ public sealed class AudioDevice
     }
 
     /// <summary>Master volume as a percentage in the range 0..100.</summary>
+    /// <returns>The current master volume scalar expressed as a percentage between 0 and 100.</returns>
     public float GetVolumePercent()
     {
         return Device.AudioEndpointVolume.MasterVolumeLevelScalar * 100f;
     }
 
     /// <summary>Sets master volume from a percentage in the range 0..100 (values are clamped).</summary>
+    /// <param name="percent">
+    /// The desired master volume as a percentage. Values below 0 are clamped to 0 and values above
+    /// 100 are clamped to 100.
+    /// </param>
     public void SetVolumePercent(float percent)
     {
         if (percent < 0f)
@@ -82,8 +87,8 @@ public sealed class AudioDevice
     /// <summary>Gets or sets the mute state of the endpoint.</summary>
     public bool IsMuted
     {
-        get { return Device.AudioEndpointVolume.Mute; }
-        set { Device.AudioEndpointVolume.Mute = value; }
+        get => Device.AudioEndpointVolume.Mute;
+        set => Device.AudioEndpointVolume.Mute = value;
     }
 
     /// <summary>Inverts the current mute state.</summary>
@@ -93,11 +98,17 @@ public sealed class AudioDevice
     }
 
     /// <summary>Instantaneous master peak level in the range 0..1 (0 when silent).</summary>
+    /// <returns>The current master peak meter value between 0 (silent) and 1 (full scale).</returns>
     public float GetPeakValue()
     {
         return Device.AudioMeterInformation.MasterPeakValue;
     }
 
+    /// <summary>Returns a human-readable description of this endpoint.</summary>
+    /// <returns>
+    /// A string in the form <c>[Index] Name (Kind)</c>, optionally suffixed with <c>[Default]</c>
+    /// and/or <c>[DefaultComm]</c> when this endpoint is a current default device.
+    /// </returns>
     public override string ToString()
     {
         return string.Format("[{0}] {1} ({2}){3}{4}",

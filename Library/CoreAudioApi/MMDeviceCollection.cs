@@ -25,10 +25,13 @@ using AudioDeviceLib.CoreAudioApi.Interfaces;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
+/// <summary>A read-only collection of <see cref="MMDevice"/> audio endpoints returned by an enumeration.</summary>
 public class MMDeviceCollection
 {
     private IMMDeviceCollection _MMDeviceCollection;
 
+    /// <summary>Gets the number of endpoints in the collection.</summary>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public int Count
     {
         get
@@ -39,6 +42,9 @@ public class MMDeviceCollection
         }
     }
 
+    /// <summary>Gets the endpoint at the specified zero-based position.</summary>
+    /// <param name="index">The zero-based index of the endpoint to retrieve (0 to <see cref="Count"/> - 1).</param>
+    /// <returns>The <see cref="MMDevice"/> at the requested position.</returns>
     public MMDevice this[int index]
     {
         get

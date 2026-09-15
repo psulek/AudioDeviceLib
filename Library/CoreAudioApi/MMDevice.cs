@@ -26,6 +26,10 @@ using AudioDeviceLib.CoreAudioApi.Interfaces;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
+/// <summary>
+/// Managed wrapper over a Core Audio <c>IMMDevice</c>. Exposes device metadata (name, ID, state,
+/// data flow) and lazily-activated sub-interfaces for volume, metering and session management.
+/// </summary>
 public class MMDevice
 {
     #region Variables
@@ -76,6 +80,8 @@ public class MMDevice
 
     #region Properties
 
+    /// <summary>Gets the audio session manager for this endpoint (activated on first access).</summary>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the interface cannot be activated.</exception>
     public AudioSessionManager AudioSessionManager
     {
         get
@@ -89,6 +95,8 @@ public class MMDevice
         }
     }
 
+    /// <summary>Gets the peak-meter information for this endpoint (activated on first access).</summary>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the interface cannot be activated.</exception>
     public AudioMeterInformation AudioMeterInformation
     {
         get
@@ -102,6 +110,8 @@ public class MMDevice
         }
     }
 
+    /// <summary>Gets the volume/mute control for this endpoint (activated on first access).</summary>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the interface cannot be activated.</exception>
     public AudioEndpointVolume AudioEndpointVolume
     {
         get
@@ -115,6 +125,8 @@ public class MMDevice
         }
     }
 
+    /// <summary>Gets the property store for this endpoint (opened on first access).</summary>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the property store cannot be opened.</exception>
     public PropertyStore Properties
     {
         get
@@ -128,6 +140,7 @@ public class MMDevice
         }
     }
 
+    /// <summary>Gets the friendly display name of the endpoint, or "Unknown" when unavailable.</summary>
     public string FriendlyName
     {
         get
@@ -149,6 +162,8 @@ public class MMDevice
     }
 
 
+    /// <summary>Gets the Core Audio endpoint ID string that uniquely identifies this device.</summary>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public string ID
     {
         get
@@ -159,6 +174,7 @@ public class MMDevice
         }
     }
 
+    /// <summary>Gets the data-flow direction of the endpoint (render or capture).</summary>
     public EDataFlow DataFlow
     {
         get
@@ -170,6 +186,8 @@ public class MMDevice
         }
     }
 
+    /// <summary>Gets the current state of the endpoint (active, disabled, not present or unplugged).</summary>
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public EDeviceState State
     {
         get
