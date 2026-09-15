@@ -34,7 +34,7 @@ public class AudioEndPointVolumeVolumeRange
 
     internal AudioEndPointVolumeVolumeRange(IAudioEndpointVolume parent)
     {
-        Marshal.ThrowExceptionForHR(parent.GetVolumeRange(out _VolumeMindB,out _VolumeMaxdB,out _VolumeIncrementdB));
+        Marshal.ThrowExceptionForHR(parent.GetVolumeRange(out _VolumeMindB, out _VolumeMaxdB, out _VolumeIncrementdB));
     }
 
     /// <summary>Gets the minimum supported volume level, in decibels.</summary>

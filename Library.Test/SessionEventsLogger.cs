@@ -4,54 +4,63 @@
 
   SessionEventsLogger.cs
   Sample consumer of the public AudioDeviceLib IAudioSessionEvents interface.
-  Each callback simply writes to the debug output.
+  Each callback simply writes to the console, identifying the source session from the
+  AudioSessionInfo snapshot it receives.
 
   NOTE: these callbacks are raised by Windows Core Audio on arbitrary, non-UI threads,
   so keep them fast and thread-safe (Console.WriteLine is fine).
 */
 
 using System;
-using System.Diagnostics;
 using AudioDeviceLib.CoreAudioApi;
 
 namespace AudioDeviceLib.Test;
 
-internal sealed class SessionEventsLogger(string tag) : IAudioSessionEvents
+internal sealed class SessionEventsLogger : IAudioSessionEvents
 {
-    public void OnDisplayNameChanged(string newDisplayName, Guid eventContext)
+    // Builds a short prefix identifying the session, using the info carried by the notification.
+    private static string Describe(AudioSessionInfo session)
     {
-        Console.WriteLine($"[{tag}] OnDisplayNameChanged: '{newDisplayName}' (ctx {eventContext})");
+        string name = !string.IsNullOrEmpty(session.DisplayName)
+            ? session.DisplayName
+            : session.IsSystemSoundsSession ? "System Sounds" : "session";
+        return $"{name} pid={session.ProcessID}";
     }
 
-    public void OnIconPathChanged(string newIconPath, Guid eventContext)
+    public void OnDisplayNameChanged(AudioSessionInfo session, string newDisplayName, Guid eventContext)
     {
-        Console.WriteLine($"[{tag}] OnIconPathChanged: '{newIconPath}' (ctx {eventContext})");
+        Console.WriteLine($"[{Describe(session)}] OnDisplayNameChanged: '{newDisplayName}' (ctx {eventContext})");
     }
 
-    public void OnSimpleVolumeChanged(float newVolume, bool newMute, Guid eventContext)
+    public void OnIconPathChanged(AudioSessionInfo session, string newIconPath, Guid eventContext)
     {
-        Console.WriteLine($"[{tag}] OnSimpleVolumeChanged: volume={newVolume:P0} mute={newMute} (ctx {eventContext})");
+        Console.WriteLine($"[{Describe(session)}] OnIconPathChanged: '{newIconPath}' (ctx {eventContext})");
     }
 
-    public void OnChannelVolumeChanged(float[] newChannelVolumes, uint changedChannel, Guid eventContext)
+    public void OnSimpleVolumeChanged(AudioSessionInfo session, float newVolume, bool newMute, Guid eventContext)
+    {
+        Console.WriteLine($"[{Describe(session)}] OnSimpleVolumeChanged: volume={newVolume:P0} mute={newMute} (ctx {eventContext})");
+    }
+
+    public void OnChannelVolumeChanged(AudioSessionInfo session, float[] newChannelVolumes, uint changedChannel, Guid eventContext)
     {
         int count = newChannelVolumes != null ? newChannelVolumes.Length : 0;
         string values = newChannelVolumes != null ? string.Join(", ", newChannelVolumes) : "(null)";
-        Console.WriteLine($"[{tag}] OnChannelVolumeChanged: {count} channel(s) [{values}] changed={changedChannel} (ctx {eventContext})");
+        Console.WriteLine($"[{Describe(session)}] OnChannelVolumeChanged: {count} channel(s) [{values}] changed={changedChannel} (ctx {eventContext})");
     }
 
-    public void OnGroupingParamChanged(Guid newGroupingParam, Guid eventContext)
+    public void OnGroupingParamChanged(AudioSessionInfo session, Guid newGroupingParam, Guid eventContext)
     {
-        Console.WriteLine($"[{tag}] OnGroupingParamChanged: group={newGroupingParam} (ctx {eventContext})");
+        Console.WriteLine($"[{Describe(session)}] OnGroupingParamChanged: group={newGroupingParam} (ctx {eventContext})");
     }
 
-    public void OnStateChanged(AudioSessionState newState)
+    public void OnStateChanged(AudioSessionInfo session, AudioSessionState newState)
     {
-        Console.WriteLine($"[{tag}] OnStateChanged: {newState}");
+        Console.WriteLine($"[{Describe(session)}] OnStateChanged: {newState}");
     }
 
-    public void OnSessionDisconnected(AudioSessionDisconnectReason disconnectReason)
+    public void OnSessionDisconnected(AudioSessionInfo session, AudioSessionDisconnectReason disconnectReason)
     {
-        Console.WriteLine($"[{tag}] OnSessionDisconnected: {disconnectReason}");
+        Console.WriteLine($"[{Describe(session)}] OnSessionDisconnected: {disconnectReason}");
     }
 }

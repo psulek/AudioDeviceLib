@@ -32,33 +32,44 @@ interface IAudioSessionControl2
     //IAudioSession functions
     [PreserveSig]
     int GetState(out AudioSessionState state);
+
     [PreserveSig]
     int GetDisplayName(out IntPtr name);
+
     [PreserveSig]
     int SetDisplayName(string value, Guid EventContext);
+
     [PreserveSig]
     int GetIconPath(out IntPtr Path);
+
     [PreserveSig]
     int SetIconPath(string Value, Guid EventContext);
+
     [PreserveSig]
     int GetGroupingParam(out Guid GroupingParam);
+
     [PreserveSig]
     int SetGroupingParam(Guid Override, Guid Eventcontext);
+
     [PreserveSig]
     int RegisterAudioSessionNotification(IAudioSessionEventsCOM NewNotifications);
+
     [PreserveSig]
     int UnregisterAudioSessionNotification(IAudioSessionEventsCOM NewNotifications);
+
     //IAudioSession2 functions
     [PreserveSig]
-    int GetSessionIdentifier( out IntPtr retVal);
+    int GetSessionIdentifier(out IntPtr retVal);
+
     [PreserveSig]
-    int GetSessionInstanceIdentifier( out IntPtr retVal);
+    int GetSessionInstanceIdentifier(out IntPtr retVal);
+
     [PreserveSig]
-    int GetProcessId( out UInt32 retvVal);
+    int GetProcessId(out UInt32 retvVal);
+
     [PreserveSig]
     int IsSystemSoundsSession();
+
     [PreserveSig]
-    int SetDuckingPreference( bool optOut);
-
-
+    int SetDuckingPreference(bool optOut);
 }

@@ -25,26 +25,42 @@ using System;
 namespace AudioDeviceLib.CoreAudioApi;
 
 /// <summary>Well-known Core Audio endpoint property keys and set GUIDs used to read device metadata.</summary>
-public static class PKEY 
+public static class PKEY
 {
     //public static readonly Guid PKEY_DeviceInterface_FriendlyName = new Guid( 0xa45c254e, 0xdf1c, 0x4efd, 0x80, 0x20, 0x67, 0xd1, 0x46, 0xa8, 0x50, 0xe0);  
     /// <summary>Property set GUID for the endpoint form factor.</summary>
-    public static readonly Guid PKEY_AudioEndpoint_FormFactor = new Guid( 0x1da5d803, 0xd492, 0x4edd, 0x8c, 0x23, 0xe0, 0xc0, 0xff, 0xee, 0x7f, 0x0e); 
-    /// <summary>Property set GUID for the endpoint control-panel page provider.</summary>
-    public static readonly Guid PKEY_AudioEndpoint_ControlPanelPageProvider = new Guid( 0x1da5d803, 0xd492, 0x4edd, 0x8c, 0x23, 0xe0, 0xc0, 0xff, 0xee, 0x7f, 0x0e); 
-    /// <summary>Property set GUID for the endpoint association.</summary>
-    public static readonly Guid PKEY_AudioEndpoint_Association = new Guid( 0x1da5d803, 0xd492, 0x4edd, 0x8c, 0x23, 0xe0, 0xc0, 0xff, 0xee, 0x7f, 0x0e);
-    /// <summary>Property set GUID for the endpoint physical-speaker configuration.</summary>
-    public static readonly Guid PKEY_AudioEndpoint_PhysicalSpeakers = new Guid( 0x1da5d803, 0xd492, 0x4edd, 0x8c, 0x23, 0xe0, 0xc0, 0xff, 0xee, 0x7f, 0x0e);
-    /// <summary>Property set GUID for the endpoint GUID value.</summary>
-    public static readonly Guid PKEY_AudioEndpoint_GUID = new Guid( 0x1da5d803, 0xd492, 0x4edd, 0x8c, 0x23, 0xe0, 0xc0, 0xff, 0xee, 0x7f, 0x0e);
-    /// <summary>Property set GUID for the "disable system effects" flag.</summary>
-    public static readonly Guid PKEY_AudioEndpoint_Disable_SysFx = new Guid( 0x1da5d803, 0xd492, 0x4edd, 0x8c, 0x23, 0xe0, 0xc0, 0xff, 0xee, 0x7f, 0x0e);
-    /// <summary>Property set GUID for the full-range-speakers configuration.</summary>
-    public static readonly Guid PKEY_AudioEndpoint_FullRangeSpeakers = new Guid( 0x1da5d803, 0xd492, 0x4edd, 0x8c, 0x23, 0xe0, 0xc0, 0xff, 0xee, 0x7f, 0x0e);
-    /// <summary>Property set GUID for the audio engine device format.</summary>
-    public static readonly Guid PKEY_AudioEngine_DeviceFormat = new Guid(0xf19f064d, 0x82c, 0x4e27, 0xbc, 0x73, 0x68, 0x82, 0xa1, 0xbb, 0x8e, 0x4c);
-    /// <summary>Property key for the endpoint's friendly display name.</summary>
-    public static readonly PropertyKey PKEY_DeviceInterface_FriendlyName = new PropertyKey { fmtid = new Guid(0xa45c254e, 0xdf1c, 0x4efd, 0x80, 0x20, 0x67, 0xd1, 0x46, 0xa8, 0x50, 0xe0), pid = 14 };
+    public static readonly Guid PKEY_AudioEndpoint_FormFactor =
+        new Guid(0x1da5d803, 0xd492, 0x4edd, 0x8c, 0x23, 0xe0, 0xc0, 0xff, 0xee, 0x7f, 0x0e);
 
+    /// <summary>Property set GUID for the endpoint control-panel page provider.</summary>
+    public static readonly Guid PKEY_AudioEndpoint_ControlPanelPageProvider =
+        new Guid(0x1da5d803, 0xd492, 0x4edd, 0x8c, 0x23, 0xe0, 0xc0, 0xff, 0xee, 0x7f, 0x0e);
+
+    /// <summary>Property set GUID for the endpoint association.</summary>
+    public static readonly Guid PKEY_AudioEndpoint_Association =
+        new Guid(0x1da5d803, 0xd492, 0x4edd, 0x8c, 0x23, 0xe0, 0xc0, 0xff, 0xee, 0x7f, 0x0e);
+
+    /// <summary>Property set GUID for the endpoint physical-speaker configuration.</summary>
+    public static readonly Guid PKEY_AudioEndpoint_PhysicalSpeakers =
+        new Guid(0x1da5d803, 0xd492, 0x4edd, 0x8c, 0x23, 0xe0, 0xc0, 0xff, 0xee, 0x7f, 0x0e);
+
+    /// <summary>Property set GUID for the endpoint GUID value.</summary>
+    public static readonly Guid PKEY_AudioEndpoint_GUID =
+        new Guid(0x1da5d803, 0xd492, 0x4edd, 0x8c, 0x23, 0xe0, 0xc0, 0xff, 0xee, 0x7f, 0x0e);
+
+    /// <summary>Property set GUID for the "disable system effects" flag.</summary>
+    public static readonly Guid PKEY_AudioEndpoint_Disable_SysFx =
+        new Guid(0x1da5d803, 0xd492, 0x4edd, 0x8c, 0x23, 0xe0, 0xc0, 0xff, 0xee, 0x7f, 0x0e);
+
+    /// <summary>Property set GUID for the full-range-speakers configuration.</summary>
+    public static readonly Guid PKEY_AudioEndpoint_FullRangeSpeakers =
+        new Guid(0x1da5d803, 0xd492, 0x4edd, 0x8c, 0x23, 0xe0, 0xc0, 0xff, 0xee, 0x7f, 0x0e);
+
+    /// <summary>Property set GUID for the audio engine device format.</summary>
+    public static readonly Guid PKEY_AudioEngine_DeviceFormat =
+        new Guid(0xf19f064d, 0x82c, 0x4e27, 0xbc, 0x73, 0x68, 0x82, 0xa1, 0xbb, 0x8e, 0x4c);
+
+    /// <summary>Property key for the endpoint's friendly display name.</summary>
+    public static readonly PropertyKey PKEY_DeviceInterface_FriendlyName = new PropertyKey
+        { fmtid = new Guid(0xa45c254e, 0xdf1c, 0x4efd, 0x80, 0x20, 0x67, 0xd1, 0x46, 0xa8, 0x50, 0xe0), pid = 14 };
 }

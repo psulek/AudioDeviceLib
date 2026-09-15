@@ -40,7 +40,7 @@ public class AudioEndpointVolume : IDisposable
     private AudioEndpointVolumeCallback _CallBack;
 
     /// <summary>Raised when the endpoint volume or mute state changes.</summary>
-    public  event AudioEndpointVolumeNotificationDelegate OnVolumeNotification;
+    public event AudioEndpointVolumeNotificationDelegate OnVolumeNotification;
 
     /// <summary>Gets the supported volume range (minimum, maximum and step, in decibels) for the endpoint.</summary>
     public AudioEndPointVolumeVolumeRange VolumeRange => _VolumeRange;
@@ -60,8 +60,7 @@ public class AudioEndpointVolume : IDisposable
     {
         get
         {
-            float result;
-            Marshal.ThrowExceptionForHR(_AudioEndPointVolume.GetMasterVolumeLevel(out result));
+            Marshal.ThrowExceptionForHR(_AudioEndPointVolume.GetMasterVolumeLevel(out var result));
             return result;
         }
         set => Marshal.ThrowExceptionForHR(_AudioEndPointVolume.SetMasterVolumeLevel(value, Guid.Empty));
@@ -73,8 +72,7 @@ public class AudioEndpointVolume : IDisposable
     {
         get
         {
-            float result;
-            Marshal.ThrowExceptionForHR(_AudioEndPointVolume.GetMasterVolumeLevelScalar(out result));
+            Marshal.ThrowExceptionForHR(_AudioEndPointVolume.GetMasterVolumeLevelScalar(out var result));
             return result;
         }
         set => Marshal.ThrowExceptionForHR(_AudioEndPointVolume.SetMasterVolumeLevelScalar(value, Guid.Empty));
@@ -86,8 +84,7 @@ public class AudioEndpointVolume : IDisposable
     {
         get
         {
-            bool result;
-            Marshal.ThrowExceptionForHR(_AudioEndPointVolume.GetMute(out result));
+            Marshal.ThrowExceptionForHR(_AudioEndPointVolume.GetMute(out var result));
             return result;
         }
         set => Marshal.ThrowExceptionForHR(_AudioEndPointVolume.SetMute(value, Guid.Empty));
@@ -106,19 +103,19 @@ public class AudioEndpointVolume : IDisposable
     {
         Marshal.ThrowExceptionForHR(_AudioEndPointVolume.VolumeStepDown(Guid.Empty));
     }
+
     internal AudioEndpointVolume(IAudioEndpointVolume realEndpointVolume)
     {
-        uint HardwareSupp;
-
         _AudioEndPointVolume = realEndpointVolume;
         _Channels = new AudioEndpointVolumeChannels(_AudioEndPointVolume);
         _StepInformation = new AudioEndpointVolumeStepInformation(_AudioEndPointVolume);
-        Marshal.ThrowExceptionForHR(_AudioEndPointVolume.QueryHardwareSupport(out HardwareSupp));
+        Marshal.ThrowExceptionForHR(_AudioEndPointVolume.QueryHardwareSupport(out var HardwareSupp));
         _HardwareSupport = (EEndpointHardwareSupport)HardwareSupp;
         _VolumeRange = new AudioEndPointVolumeVolumeRange(_AudioEndPointVolume);
         _CallBack = new AudioEndpointVolumeCallback(this);
-        Marshal.ThrowExceptionForHR(_AudioEndPointVolume.RegisterControlChangeNotify( _CallBack));
+        Marshal.ThrowExceptionForHR(_AudioEndPointVolume.RegisterControlChangeNotify(_CallBack));
     }
+
     internal void FireNotification(AudioVolumeNotificationData NotificationData)
     {
         AudioEndpointVolumeNotificationDelegate del = OnVolumeNotification;
@@ -127,24 +124,38 @@ public class AudioEndpointVolume : IDisposable
             del(NotificationData);
         }
     }
+
     #region IDisposable Members
 
-    /// <summary>Unregisters the volume-change notification callback and releases the native resources.</summary>
-    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when unregistering the callback fails.</exception>
+    /// <summary>Unregisters the volume-change notification callback. Safe to call more than once.</summary>
     public void Dispose()
+    {
+        Dispose(true);
+        GC.SuppressFinalize(this);
+    }
+
+    private void Dispose(bool disposing)
     {
         if (_CallBack != null)
         {
-            Marshal.ThrowExceptionForHR(_AudioEndPointVolume.UnregisterControlChangeNotify( _CallBack ));
+            try
+            {
+                _AudioEndPointVolume.UnregisterControlChangeNotify(_CallBack);
+            }
+            catch
+            {
+                // Best-effort: never let an exception escape Dispose (and never throw on the
+                // finalizer thread, which would crash the process).
+            }
+
             _CallBack = null;
         }
     }
 
     ~AudioEndpointVolume()
     {
-        Dispose();
+        Dispose(false);
     }
 
     #endregion
-       
 }

@@ -30,11 +30,15 @@ namespace AudioDeviceLib.CoreAudioApi.Interfaces;
 internal interface IMMDevice
 {
     [PreserveSig]
-    int Activate(ref Guid iid, CLSCTX dwClsCtx, IntPtr pActivationParams,  [MarshalAs(UnmanagedType.IUnknown)] out object  ppInterface);
+    int Activate(ref Guid iid, CLSCTX dwClsCtx, IntPtr pActivationParams,
+        [MarshalAs(UnmanagedType.IUnknown)] out object ppInterface);
+
     [PreserveSig]
     int OpenPropertyStore(EStgmAccess stgmAccess, out IPropertyStore propertyStore);
+
     [PreserveSig]
     int GetId([MarshalAs(UnmanagedType.LPWStr)] out string ppstrId);
+
     [PreserveSig]
     int GetState(out EDeviceState pdwState);
 }

@@ -30,6 +30,7 @@ public class AudioEndpointVolumeStepInformation
 {
     private uint _Step;
     private uint _StepCount;
+
     internal AudioEndpointVolumeStepInformation(IAudioEndpointVolume parent)
     {
         Marshal.ThrowExceptionForHR(parent.GetVolumeStepInfo(out _Step, out _StepCount));

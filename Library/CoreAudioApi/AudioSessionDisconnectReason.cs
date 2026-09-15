@@ -41,5 +41,5 @@ public enum AudioSessionDisconnectReason
     DisconnectReasonSessionDisconnected = (DisconnectReasonSessionLogoff + 1),
 
     /// <summary>The (shared-mode) session was pre-empted by an exclusive-mode connection.</summary>
-    DisconnectReasonExclusiveModeOverride = (DisconnectReasonSessionDisconnected + 1) 
+    DisconnectReasonExclusiveModeOverride = (DisconnectReasonSessionDisconnected + 1)
 }

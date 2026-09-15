@@ -32,8 +32,8 @@ public enum EEndpointHardwareSupport
     Volume = 0x00000001,
 
     /// <summary>The endpoint supports a hardware mute control.</summary>
-    Mute   = 0x00000002,
+    Mute = 0x00000002,
 
     /// <summary>The endpoint supports a hardware peak meter.</summary>
-    Meter  = 0x00000004
+    Meter = 0x00000004
 }

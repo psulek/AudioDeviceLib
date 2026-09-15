@@ -30,11 +30,14 @@ namespace AudioDeviceLib.CoreAudioApi.Interfaces;
 internal interface ISimpleAudioVolume
 {
     [PreserveSig]
-    int SetMasterVolume(  float fLevel,ref Guid EventContext);
+    int SetMasterVolume(float fLevel, ref Guid EventContext);
+
     [PreserveSig]
-    int GetMasterVolume( out float pfLevel);
+    int GetMasterVolume(out float pfLevel);
+
     [PreserveSig]
-    int SetMute( bool bMute, ref Guid EventContext) ;
+    int SetMute(bool bMute, ref Guid EventContext);
+
     [PreserveSig]
-    int GetMute( out bool bMute);
+    int GetMute(out bool bMute);
 }

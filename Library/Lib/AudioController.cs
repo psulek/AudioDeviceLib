@@ -22,7 +22,7 @@ namespace AudioDeviceLib.Lib;
 /// High-level API over the Windows Core Audio endpoints. Create one instance and reuse it.
 /// All members are Windows-only and must run on a thread able to use COM.
 /// </summary>
-public sealed class AudioController
+public sealed class AudioController : IDisposable
 {
     private readonly MMDeviceEnumerator _enumerator = new MMDeviceEnumerator();
 
@@ -36,7 +36,8 @@ public sealed class AudioController
     /// </returns>
     public IReadOnlyList<AudioDevice> GetDevices()
     {
-        MMDeviceCollection collection = _enumerator.EnumerateAudioEndPoints(EDataFlow.eAll, EDeviceState.DEVICE_STATE_ACTIVE);
+        MMDeviceCollection devices =
+            _enumerator.EnumerateAudioEndPoints(EDataFlow.eAll, EDeviceState.DEVICE_STATE_ACTIVE);
 
         // Resolve the current defaults once, then tag each endpoint (cheaper than the
         // per-device lookups the original toolkit performed).
@@ -45,13 +46,13 @@ public sealed class AudioController
         string commPlaybackId = TryGetDefaultId(EDataFlow.eRender, ERole.eCommunications);
         string commRecordingId = TryGetDefaultId(EDataFlow.eCapture, ERole.eCommunications);
 
-        var result = new List<AudioDevice>(collection.Count);
-        for (int i = 0; i < collection.Count; i++)
+        var result = new List<AudioDevice>(devices.Count);
+        for (int i = 0; i < devices.Count; i++)
         {
-            MMDevice mm = collection[i];
-            bool isDefault = mm.ID == defaultPlaybackId || mm.ID == defaultRecordingId;
-            bool isDefaultComm = mm.ID == commPlaybackId || mm.ID == commRecordingId;
-            result.Add(new AudioDevice(i + 1, mm, isDefault, isDefaultComm));
+            MMDevice device = devices[i];
+            bool isDefault = device.ID == defaultPlaybackId || device.ID == defaultRecordingId;
+            bool isDefaultComm = device.ID == commPlaybackId || device.ID == commRecordingId;
+            result.Add(new AudioDevice(i + 1, device, isDefault, isDefaultComm));
         }
 
         return result;
@@ -148,7 +149,8 @@ public sealed class AudioController
 
         if ((roles & DefaultRole.All) == 0)
         {
-            throw new ArgumentException("At least one role (Console, Multimedia or Communications) must be specified.", nameof(roles));
+            throw new ArgumentException("At least one role (Console, Multimedia or Communications) must be specified.",
+                nameof(roles));
         }
 
         var client = new PolicyConfigClient();
@@ -156,10 +158,12 @@ public sealed class AudioController
         {
             client.SetDefaultEndpoint(deviceId, ERole.eConsole);
         }
+
         if ((roles & DefaultRole.Multimedia) != 0)
         {
             client.SetDefaultEndpoint(deviceId, ERole.eMultimedia);
         }
+
         if ((roles & DefaultRole.Communications) != 0)
         {
             client.SetDefaultEndpoint(deviceId, ERole.eCommunications);
@@ -232,6 +236,7 @@ public sealed class AudioController
         {
             return null;
         }
+
         if (mm == null)
         {
             return null;
@@ -265,5 +270,16 @@ public sealed class AudioController
         return devices.FirstOrDefault(d =>
             d.Name != null &&
             d.Name.IndexOf(nameSubstring, StringComparison.OrdinalIgnoreCase) >= 0);
+    }
+
+    /// <summary>
+    /// Releases resources held by the controller. The controller does not own the
+    /// <see cref="AudioDevice"/> instances returned by its methods; dispose those yourself when
+    /// you have accessed their volume/session features.
+    /// </summary>
+    public void Dispose()
+    {
+        // The enumerator registers no callbacks; nothing to release deterministically today.
+        // Present so callers can `using` the controller and to give future cleanup a home.
     }
 }

@@ -81,16 +81,17 @@ internal static class Program
             return 0;
         }
 
-        Console.WriteLine("Idx  Kind       Def  Comm  Name");
+        Console.WriteLine("Idx  Kind       Def  Comm  Name, ID");
         Console.WriteLine("---  ---------  ---  ----  --------------------------------------");
         foreach (var d in devices)
         {
-            Console.WriteLine("{0,3}  {1,-9}  {2,-3}  {3,-4}  {4}",
+            Console.WriteLine("{0,3}  {1,-9}  {2,-3}  {3,-4}  {4}, {5}",
                 d.Index,
                 d.Kind,
                 d.IsDefault ? "*" : "",
                 d.IsDefaultCommunication ? "*" : "",
-                d.Name);
+                d.Name,
+                d.Id);
         }
         return 0;
     }
@@ -120,8 +121,7 @@ internal static class Program
 
     private static int CmdSet(AudioController audio, Options o)
     {
-        DefaultRole role;
-        if (!TryGetRole(o, out role))
+        if (!TryGetRole(o, out DefaultRole role))
         {
             return 1;
         }
@@ -155,9 +155,8 @@ internal static class Program
             return 0;
         }
 
-        float pct;
         if (!float.TryParse(setVal, System.Globalization.NumberStyles.Float,
-                System.Globalization.CultureInfo.InvariantCulture, out pct))
+                System.Globalization.CultureInfo.InvariantCulture, out var pct))
         {
             Console.Error.WriteLine("Invalid volume value: " + setVal + " (expected 0..100)");
             return 1;
@@ -242,24 +241,16 @@ internal static class Program
 
         // 1) Per-session events (the app / "System sounds" sliders in the mixer).
         SessionCollection sessions = device.Device.AudioSessionManager.Sessions;
-        var registered = new List<AudioSessionControl>();
-        var loggers = new List<SessionEventsLogger>();
+        var registrations = new List<IDisposable>();
 
         for (int i = 0; i < sessions.Count; i++)
         {
             AudioSessionControl session = sessions[i];
 
-            string tag;
-            try { tag = session.DisplayName; } catch { tag = null; }
-            if (string.IsNullOrEmpty(tag))
-            {
-                tag = "session#" + i;
-            }
-
-            var logger = new SessionEventsLogger(tag);
-            session.RegisterAudioSessionNotification(logger);
-            registered.Add(session);
-            loggers.Add(logger);
+            // The logger identifies each session from the AudioSessionInfo it receives per callback.
+            var logger = new SessionEventsLogger();
+            // Register returns an IDisposable token; dispose it to unregister.
+            registrations.Add(session.RegisterAudioSessionNotification(logger));
         }
 
         // 2) Endpoint (device master) volume events (the "System -> Volume" slider).
@@ -271,14 +262,14 @@ internal static class Program
         endpointVolume.OnVolumeNotification += endpointHandler;
 
         Console.WriteLine(
-            $"Registered on {registered.Count} session(s) + endpoint master volume. " +
+            $"Registered on {registrations.Count} session(s) + endpoint master volume. " +
             "Change app or system volume/mute in the Windows mixer to see events. Press Enter to stop.");
         Console.ReadLine();
 
         endpointVolume.OnVolumeNotification -= endpointHandler;
-        for (int i = 0; i < registered.Count; i++)
+        foreach (IDisposable registration in registrations)
         {
-            try { registered[i].UnregisterAudioSessionNotification(loggers[i]); }
+            try { registration.Dispose(); }
             catch { /* best-effort cleanup */ }
         }
 
@@ -323,8 +314,7 @@ internal static class Program
         }
         else if (indexStr != null)
         {
-            int idx;
-            if (!int.TryParse(indexStr, out idx))
+            if (!int.TryParse(indexStr, out var idx))
             {
                 Console.Error.WriteLine("Invalid index: " + indexStr);
                 return null;
@@ -496,8 +486,7 @@ internal static class Program
         // Returns the value, or null if the key was not supplied.
         public string Get(string key)
         {
-            string v;
-            return _map.TryGetValue(key, out v) ? v : null;
+            return _map.TryGetValue(key, out var v) ? v : null;
         }
     }
 

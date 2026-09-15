@@ -48,11 +48,13 @@ public class PolicyConfigClient
             Marshal.ThrowExceptionForHR(_PolicyConfig.SetDefaultEndpoint(devID, eRole));
             return;
         }
+
         if (_PolicyConfigVista != null)
         {
             Marshal.ThrowExceptionForHR(_PolicyConfigVista.SetDefaultEndpoint(devID, eRole));
             return;
         }
+
         if (_PolicyConfig10 != null)
         {
             Marshal.ThrowExceptionForHR(_PolicyConfig10.SetDefaultEndpoint(devID, eRole));

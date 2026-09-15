@@ -37,13 +37,10 @@ public class AudioMeterInformation
 
     internal AudioMeterInformation(IAudioMeterInformation realInterface)
     {
-        int HardwareSupp;
-
         _AudioMeterInformation = realInterface;
-        Marshal.ThrowExceptionForHR(_AudioMeterInformation.QueryHardwareSupport(out HardwareSupp));
+        Marshal.ThrowExceptionForHR(_AudioMeterInformation.QueryHardwareSupport(out var HardwareSupp));
         _HardwareSupport = (EEndpointHardwareSupport)HardwareSupp;
         _Channels = new AudioMeterInformationChannels(_AudioMeterInformation);
-
     }
 
     /// <summary>Gets the collection of per-channel peak meter values.</summary>
@@ -58,15 +55,8 @@ public class AudioMeterInformation
     {
         get
         {
-            float result;
-            Marshal.ThrowExceptionForHR(_AudioMeterInformation.GetPeakValue(out result));
+            Marshal.ThrowExceptionForHR(_AudioMeterInformation.GetPeakValue(out var result));
             return result;
         }
     }
-
-       
-
-      
-
-
 }

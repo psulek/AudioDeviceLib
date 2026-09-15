@@ -37,7 +37,7 @@ internal class _MMDeviceEnumerator
 /// Managed wrapper over the Core Audio <c>IMMDeviceEnumerator</c>. Enumerates audio endpoints and
 /// resolves default devices. Windows Vista or newer is required.
 /// </summary>
-public class MMDeviceEnumerator 
+public class MMDeviceEnumerator
 {
     private IMMDeviceEnumerator _realEnumerator = new _MMDeviceEnumerator() as IMMDeviceEnumerator;
 
@@ -48,8 +48,8 @@ public class MMDeviceEnumerator
     /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public MMDeviceCollection EnumerateAudioEndPoints(EDataFlow dataFlow, EDeviceState dwStateMask)
     {
-        IMMDeviceCollection result;
-        Marshal.ThrowExceptionForHR(_realEnumerator.EnumAudioEndpoints(dataFlow,dwStateMask,out result));
+        Marshal.ThrowExceptionForHR(
+            _realEnumerator.EnumAudioEndpoints(dataFlow, dwStateMask, out IMMDeviceCollection result));
         return new MMDeviceCollection(result);
     }
 
@@ -60,8 +60,8 @@ public class MMDeviceEnumerator
     /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when no default endpoint exists or the underlying Core Audio call fails.</exception>
     public MMDevice GetDefaultAudioEndpoint(EDataFlow dataFlow, ERole role)
     {
-        IMMDevice _Device = null;
-        Marshal.ThrowExceptionForHR(((IMMDeviceEnumerator)_realEnumerator).GetDefaultAudioEndpoint(dataFlow, role, out _Device));
+        Marshal.ThrowExceptionForHR(
+            ((IMMDeviceEnumerator)_realEnumerator).GetDefaultAudioEndpoint(dataFlow, role, out IMMDevice _Device));
         return new MMDevice(_Device);
     }
 
@@ -71,8 +71,7 @@ public class MMDeviceEnumerator
     /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the ID is unknown or the underlying Core Audio call fails.</exception>
     public MMDevice GetDevice(string ID)
     {
-        IMMDevice _Device = null;
-        Marshal.ThrowExceptionForHR(((IMMDeviceEnumerator)_realEnumerator).GetDevice(ID, out _Device));
+        Marshal.ThrowExceptionForHR(((IMMDeviceEnumerator)_realEnumerator).GetDevice(ID, out IMMDevice _Device));
         return new MMDevice(_Device);
     }
 

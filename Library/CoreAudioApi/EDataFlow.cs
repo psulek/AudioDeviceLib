@@ -32,8 +32,8 @@ public enum EDataFlow
     eCapture = 1,
 
     /// <summary>Either direction; used when enumerating all endpoints.</summary>
-    eAll = 2 ,
+    eAll = 2,
 
     /// <summary>The number of defined data-flow values (not a real direction).</summary>
-    EDataFlow_enum_count =3
+    EDataFlow_enum_count = 3
 }

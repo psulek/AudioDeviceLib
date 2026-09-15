@@ -57,8 +57,9 @@ public struct PropVariant
         byte[] Result = new byte[blobVal.Length];
         for (int i = 0; i < blobVal.Length; i++)
         {
-            Result[i] = Marshal.ReadByte((IntPtr) ((long)(blobVal.Data) + i));
+            Result[i] = Marshal.ReadByte((IntPtr)((long)(blobVal.Data) + i));
         }
+
         return Result;
     }
 
@@ -91,8 +92,8 @@ public struct PropVariant
                 case VarEnum.VT_BLOB:
                     return GetBlob();
             }
+
             return "FIXME Type = " + ve.ToString();
         }
     }
-        
 }

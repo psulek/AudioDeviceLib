@@ -30,50 +30,53 @@ namespace AudioDeviceLib.CoreAudioApi;
 /// Managed wrapper over a Core Audio <c>IMMDevice</c>. Exposes device metadata (name, ID, state,
 /// data flow) and lazily-activated sub-interfaces for volume, metering and session management.
 /// </summary>
-public class MMDevice
+public class MMDevice : IDisposable
 {
     #region Variables
-    private IMMDevice _RealDevice;
-    private PropertyStore _PropertyStore;
-    private AudioMeterInformation _AudioMeterInformation;
-    private AudioEndpointVolume _AudioEndpointVolume;
-    private AudioSessionManager _AudioSessionManager;
+
+    private readonly IMMDevice _realDevice;
+    private PropertyStore _propertyStore;
+    private AudioMeterInformation _audioMeterInformation;
+    private AudioEndpointVolume _audioEndpointVolume;
+    private AudioSessionManager _audioSessionManager;
 
     #endregion
 
     #region Guids
-    private static Guid IID_IAudioMeterInformation = typeof(IAudioMeterInformation).GUID; 
-    private static Guid IID_IAudioEndpointVolume = typeof(IAudioEndpointVolume).GUID;  
+
+    private static Guid IID_IAudioMeterInformation = typeof(IAudioMeterInformation).GUID;
+    private static Guid IID_IAudioEndpointVolume = typeof(IAudioEndpointVolume).GUID;
     private static Guid IID_IAudioSessionManager = typeof(IAudioSessionManager2).GUID;
+
     #endregion
 
     #region Init
+
     private void GetPropertyInformation()
     {
-        IPropertyStore propstore;
-        Marshal.ThrowExceptionForHR(_RealDevice.OpenPropertyStore(EStgmAccess.STGM_READ, out propstore));
-        _PropertyStore = new PropertyStore(propstore);
+        Marshal.ThrowExceptionForHR(_realDevice.OpenPropertyStore(EStgmAccess.STGM_READ, out var propstore));
+        _propertyStore = new PropertyStore(propstore);
     }
 
     private void GetAudioSessionManager()
     {
-        object result;
-        Marshal.ThrowExceptionForHR(_RealDevice.Activate(ref IID_IAudioSessionManager, CLSCTX.ALL, IntPtr.Zero, out result));
-        _AudioSessionManager = new AudioSessionManager(result as IAudioSessionManager2);
+        Marshal.ThrowExceptionForHR(_realDevice.Activate(ref IID_IAudioSessionManager, CLSCTX.ALL, IntPtr.Zero,
+            out var result));
+        _audioSessionManager = new AudioSessionManager(result as IAudioSessionManager2);
     }
 
     private void GetAudioMeterInformation()
     {
-        object result;
-        Marshal.ThrowExceptionForHR( _RealDevice.Activate(ref IID_IAudioMeterInformation, CLSCTX.ALL, IntPtr.Zero, out result));
-        _AudioMeterInformation = new AudioMeterInformation( result as IAudioMeterInformation);
+        Marshal.ThrowExceptionForHR(_realDevice.Activate(ref IID_IAudioMeterInformation, CLSCTX.ALL, IntPtr.Zero,
+            out var result));
+        _audioMeterInformation = new AudioMeterInformation(result as IAudioMeterInformation);
     }
 
     private void GetAudioEndpointVolume()
     {
-        object result;
-        Marshal.ThrowExceptionForHR(_RealDevice.Activate(ref IID_IAudioEndpointVolume, CLSCTX.ALL, IntPtr.Zero, out result));
-        _AudioEndpointVolume = new AudioEndpointVolume(result as IAudioEndpointVolume);
+        Marshal.ThrowExceptionForHR(_realDevice.Activate(ref IID_IAudioEndpointVolume, CLSCTX.ALL, IntPtr.Zero,
+            out var result));
+        _audioEndpointVolume = new AudioEndpointVolume(result as IAudioEndpointVolume);
     }
 
     #endregion
@@ -86,12 +89,12 @@ public class MMDevice
     {
         get
         {
-            if (_AudioSessionManager == null)
+            if (_audioSessionManager == null)
             {
                 GetAudioSessionManager();
             }
 
-            return _AudioSessionManager;
+            return _audioSessionManager;
         }
     }
 
@@ -101,12 +104,12 @@ public class MMDevice
     {
         get
         {
-            if (_AudioMeterInformation == null)
+            if (_audioMeterInformation == null)
             {
                 GetAudioMeterInformation();
             }
 
-            return _AudioMeterInformation;
+            return _audioMeterInformation;
         }
     }
 
@@ -116,12 +119,12 @@ public class MMDevice
     {
         get
         {
-            if (_AudioEndpointVolume == null)
+            if (_audioEndpointVolume == null)
             {
                 GetAudioEndpointVolume();
             }
 
-            return _AudioEndpointVolume;
+            return _audioEndpointVolume;
         }
     }
 
@@ -131,12 +134,12 @@ public class MMDevice
     {
         get
         {
-            if (_PropertyStore == null)
+            if (_propertyStore == null)
             {
                 GetPropertyInformation();
             }
 
-            return _PropertyStore;
+            return _propertyStore;
         }
     }
 
@@ -145,19 +148,17 @@ public class MMDevice
     {
         get
         {
-            if (_PropertyStore == null)
+            if (_propertyStore == null)
             {
                 GetPropertyInformation();
             }
 
-            if (_PropertyStore.Contains(PKEY.PKEY_DeviceInterface_FriendlyName))
+            if (_propertyStore.Contains(PKEY.PKEY_DeviceInterface_FriendlyName))
             {
-                return (string)_PropertyStore[PKEY.PKEY_DeviceInterface_FriendlyName].Value;
+                return (string)_propertyStore[PKEY.PKEY_DeviceInterface_FriendlyName].Value;
             }
-            else
-            {
-                return "Unknown";
-            }
+
+            return "Unknown";
         }
     }
 
@@ -168,9 +169,8 @@ public class MMDevice
     {
         get
         {
-            string Result;
-            Marshal.ThrowExceptionForHR(_RealDevice.GetId(out Result));
-            return Result;
+            Marshal.ThrowExceptionForHR(_realDevice.GetId(out var result));
+            return result;
         }
     }
 
@@ -179,10 +179,9 @@ public class MMDevice
     {
         get
         {
-            EDataFlow Result;
-            IMMEndpoint ep =  _RealDevice as IMMEndpoint ;
-            ep.GetDataFlow(out Result);
-            return Result;
+            var ep = _realDevice as IMMEndpoint;
+            ep.GetDataFlow(out var result);
+            return result;
         }
     }
 
@@ -192,19 +191,36 @@ public class MMDevice
     {
         get
         {
-            EDeviceState Result;
-            Marshal.ThrowExceptionForHR(_RealDevice.GetState(out Result));
-            return Result;
-
+            Marshal.ThrowExceptionForHR(_realDevice.GetState(out var result));
+            return result;
         }
     }
+
     #endregion
 
     #region Constructor
+
     internal MMDevice(IMMDevice realDevice)
     {
-        _RealDevice = realDevice;
+        _realDevice = realDevice;
     }
+
     #endregion
 
+    #region IDisposable
+
+    /// <summary>
+    /// Disposes the lazily-activated sub-interfaces that hold registered COM callbacks or cached
+    /// sessions (the endpoint volume and the session manager), if they were created.
+    /// </summary>
+    public void Dispose()
+    {
+        _audioEndpointVolume?.Dispose();
+        _audioEndpointVolume = null;
+
+        _audioSessionManager?.Dispose();
+        _audioSessionManager = null;
+    }
+
+    #endregion
 }

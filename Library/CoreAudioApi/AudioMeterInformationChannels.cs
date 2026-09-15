@@ -36,8 +36,7 @@ public class AudioMeterInformationChannels
     {
         get
         {
-            int result;
-            Marshal.ThrowExceptionForHR(_AudioMeterInformation.GetMeteringChannelCount(out result));
+            Marshal.ThrowExceptionForHR(_AudioMeterInformation.GetMeteringChannelCount(out var result));
             return result;
         }
     }
@@ -52,7 +51,8 @@ public class AudioMeterInformationChannels
         {
             float[] peakValues = new float[Count];
             GCHandle Params = GCHandle.Alloc(peakValues, GCHandleType.Pinned);
-            Marshal.ThrowExceptionForHR(_AudioMeterInformation.GetChannelsPeakValues(peakValues.Length, Params.AddrOfPinnedObject()));
+            Marshal.ThrowExceptionForHR(
+                _AudioMeterInformation.GetChannelsPeakValues(peakValues.Length, Params.AddrOfPinnedObject()));
             Params.Free();
             return peakValues[index];
         }

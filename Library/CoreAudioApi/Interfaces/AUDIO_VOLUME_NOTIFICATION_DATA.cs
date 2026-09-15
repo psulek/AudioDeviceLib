@@ -26,10 +26,10 @@ namespace AudioDeviceLib.CoreAudioApi.Interfaces;
 
 internal struct AUDIO_VOLUME_NOTIFICATION_DATA
 {
-    public Guid   guidEventContext;
-    public bool   bMuted;
-    public float  fMasterVolume;
-    public uint   nChannels;
+    public Guid guidEventContext;
+    public bool bMuted;
+    public float fMasterVolume;
+    public uint nChannels;
     public float ChannelVolume;
 
     //Code Should Compile at warning level4 without any warnings, 
@@ -47,5 +47,4 @@ internal struct AUDIO_VOLUME_NOTIFICATION_DATA
         nChannels = 0;
         ChannelVolume = 0;
     }
-
 }

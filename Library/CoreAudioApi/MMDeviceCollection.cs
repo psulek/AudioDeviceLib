@@ -36,8 +36,7 @@ public class MMDeviceCollection
     {
         get
         {
-            uint result;
-            Marshal.ThrowExceptionForHR(_MMDeviceCollection.GetCount(out result));
+            Marshal.ThrowExceptionForHR(_MMDeviceCollection.GetCount(out var result));
             return (int)result;
         }
     }
@@ -49,8 +48,7 @@ public class MMDeviceCollection
     {
         get
         {
-            IMMDevice result;
-            _MMDeviceCollection.Item((uint)index, out result);
+            _MMDeviceCollection.Item((uint)index, out IMMDevice result);
             return new MMDevice(result);
         }
     }

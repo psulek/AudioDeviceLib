@@ -26,14 +26,14 @@ namespace AudioDeviceLib.CoreAudioApi;
 public enum ERole
 {
     /// <summary>Games, system notification sounds and voice commands.</summary>
-    eConsole =0,
+    eConsole = 0,
 
     /// <summary>Music, movies, narration and live-music recording.</summary>
-    eMultimedia =1,
+    eMultimedia = 1,
 
     /// <summary>Voice communications (e.g. talking to another person).</summary>
-    eCommunications=2,
+    eCommunications = 2,
 
     /// <summary>The number of defined role values (not a real role).</summary>
-    ERole_enum_count=3
+    ERole_enum_count = 3
 }

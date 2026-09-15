@@ -20,6 +20,7 @@
   3. This notice may not be removed or altered from any source distribution.
 */
 
+using System;
 using System.Runtime.InteropServices;
 using AudioDeviceLib.CoreAudioApi.Interfaces;
 
@@ -29,19 +30,24 @@ namespace AudioDeviceLib.CoreAudioApi;
 /// Managed wrapper over the Core Audio <c>IAudioSessionManager2</c> interface. Provides access to
 /// the collection of audio sessions on an endpoint.
 /// </summary>
-public class AudioSessionManager
+public class AudioSessionManager : IDisposable
 {
     private IAudioSessionManager2 _AudioSessionManager;
     private SessionCollection _Sessions;
-        
+
     internal AudioSessionManager(IAudioSessionManager2 realAudioSessionManager)
     {
         _AudioSessionManager = realAudioSessionManager;
-        IAudioSessionEnumerator _SessionEnum ;
-        Marshal.ThrowExceptionForHR(_AudioSessionManager.GetSessionEnumerator(out _SessionEnum));
+        Marshal.ThrowExceptionForHR(_AudioSessionManager.GetSessionEnumerator(out IAudioSessionEnumerator _SessionEnum));
         _Sessions = new SessionCollection(_SessionEnum);
     }
 
     /// <summary>Gets the collection of audio sessions currently associated with the endpoint.</summary>
     public SessionCollection Sessions => _Sessions;
+
+    /// <summary>Disposes the owned <see cref="SessionCollection"/> (and its cached sessions).</summary>
+    public void Dispose()
+    {
+        _Sessions?.Dispose();
+    }
 }

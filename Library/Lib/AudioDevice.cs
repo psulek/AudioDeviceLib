@@ -18,7 +18,12 @@ namespace AudioDeviceLib.Lib;
 /// A single active Windows audio endpoint, wrapping the underlying <see cref="MMDevice"/>
 /// and exposing volume/mute helpers.
 /// </summary>
-public sealed class AudioDevice
+/// <remarks>
+/// Dispose an <see cref="AudioDevice"/> once you are done with it if you used its volume helpers
+/// or accessed <see cref="Device"/> for sessions/endpoint volume; that deterministically tears
+/// down any registered Core Audio callbacks. Enumeration-only instances hold nothing registered.
+/// </remarks>
+public sealed class AudioDevice : IDisposable
 {
     /// <summary>1-based position in the enumeration of all active endpoints.</summary>
     public int Index { get; }
@@ -56,6 +61,8 @@ public sealed class AudioDevice
         Id = baseDevice.ID;
         Device = baseDevice;
     }
+    
+    public AudioDeviceInfo ToDeviceInfo() => new AudioDeviceInfo(Index, IsDefault, IsDefaultCommunication, Kind, Name, Id);
 
     /// <summary>Master volume as a percentage in the range 0..100.</summary>
     /// <returns>The current master volume scalar expressed as a percentage between 0 and 100.</returns>
@@ -115,5 +122,11 @@ public sealed class AudioDevice
             Index, Name, Kind,
             IsDefault ? " [Default]" : string.Empty,
             IsDefaultCommunication ? " [DefaultComm]" : string.Empty);
+    }
+
+    /// <summary>Disposes the underlying <see cref="MMDevice"/>, releasing any Core Audio callbacks it holds.</summary>
+    public void Dispose()
+    {
+        Device?.Dispose();
     }
 }

@@ -30,6 +30,7 @@ internal interface IMMDeviceCollection
 {
     [PreserveSig]
     int GetCount(out uint pcDevices);
+
     [PreserveSig]
     int Item(uint nDevice, out IMMDevice Device);
 }

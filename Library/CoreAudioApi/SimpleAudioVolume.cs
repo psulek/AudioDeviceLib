@@ -33,6 +33,7 @@ namespace AudioDeviceLib.CoreAudioApi;
 public class SimpleAudioVolume
 {
     ISimpleAudioVolume _SimpleAudioVolume;
+
     internal SimpleAudioVolume(ISimpleAudioVolume realSimpleVolume)
     {
         _SimpleAudioVolume = realSimpleVolume;
@@ -44,8 +45,7 @@ public class SimpleAudioVolume
     {
         get
         {
-            float ret;
-            Marshal.ThrowExceptionForHR(_SimpleAudioVolume.GetMasterVolume(out ret));
+            Marshal.ThrowExceptionForHR(_SimpleAudioVolume.GetMasterVolume(out var ret));
             return ret;
         }
         set
@@ -61,8 +61,7 @@ public class SimpleAudioVolume
     {
         get
         {
-            bool ret;
-            Marshal.ThrowExceptionForHR(_SimpleAudioVolume.GetMute(out ret));
+            Marshal.ThrowExceptionForHR(_SimpleAudioVolume.GetMute(out var ret));
             return ret;
         }
         set

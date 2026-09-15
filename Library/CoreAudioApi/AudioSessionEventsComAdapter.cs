@@ -13,6 +13,7 @@ using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
+using System.Threading;
 using AudioDeviceLib.CoreAudioApi.Interfaces;
 
 namespace AudioDeviceLib.CoreAudioApi;
@@ -29,33 +30,59 @@ internal sealed class AudioSessionEventsComAdapter : IAudioSessionEventsCOM
 {
     private const int S_OK = 0;
 
+    /// <summary>The session these notifications originate from; the source for each snapshot.</summary>
+    private readonly AudioSessionControl _session;
+
     /// <summary>The consumer implementation these COM callbacks are forwarded to.</summary>
     internal IAudioSessionEvents Target { get; }
 
-    public AudioSessionEventsComAdapter(IAudioSessionEvents target)
+    public AudioSessionEventsComAdapter(AudioSessionControl session, IAudioSessionEvents target)
     {
+        _session = session ?? throw new ArgumentNullException(nameof(session));
         Target = target ?? throw new ArgumentNullException(nameof(target));
     }
 
     public int OnDisplayNameChanged(string NewDisplayName, Guid EventContext)
     {
-        try { Target.OnDisplayNameChanged(NewDisplayName, EventContext); return S_OK; }
-        catch (Exception ex) { return Marshal.GetHRForException(ex); }
+        try
+        {
+            Target.OnDisplayNameChanged(_session.ToSessionInfo(), NewDisplayName, EventContext);
+            return S_OK;
+        }
+        catch (Exception ex)
+        {
+            return Marshal.GetHRForException(ex);
+        }
     }
 
     public int OnIconPathChanged(string NewIconPath, Guid EventContext)
     {
-        try { Target.OnIconPathChanged(NewIconPath, EventContext); return S_OK; }
-        catch (Exception ex) { return Marshal.GetHRForException(ex); }
+        try
+        {
+            Target.OnIconPathChanged(_session.ToSessionInfo(), NewIconPath, EventContext);
+            return S_OK;
+        }
+        catch (Exception ex)
+        {
+            return Marshal.GetHRForException(ex);
+        }
     }
 
     public int OnSimpleVolumeChanged(float NewVolume, bool newMute, Guid EventContext)
     {
-        try { Target.OnSimpleVolumeChanged(NewVolume, newMute, EventContext); return S_OK; }
-        catch (Exception ex) { return Marshal.GetHRForException(ex); }
+        try
+        {
+            Target.OnSimpleVolumeChanged(_session.ToSessionInfo(), NewVolume, newMute, EventContext);
+            return S_OK;
+        }
+        catch (Exception ex)
+        {
+            return Marshal.GetHRForException(ex);
+        }
     }
 
-    public int OnChannelVolumeChanged(uint ChannelCount, IntPtr NewChannelVolumeArray, uint ChangedChannel, Guid EventContext)
+    public int OnChannelVolumeChanged(uint ChannelCount, IntPtr NewChannelVolumeArray, uint ChangedChannel,
+        Guid EventContext)
     {
         try
         {
@@ -70,28 +97,74 @@ internal sealed class AudioSessionEventsComAdapter : IAudioSessionEventsCOM
                 volumes = new float[0];
             }
 
-            Target.OnChannelVolumeChanged(volumes, ChangedChannel, EventContext);
+            Target.OnChannelVolumeChanged(_session.ToSessionInfo(), volumes, ChangedChannel, EventContext);
             return S_OK;
         }
-        catch (Exception ex) { return Marshal.GetHRForException(ex); }
+        catch (Exception ex)
+        {
+            return Marshal.GetHRForException(ex);
+        }
     }
 
     public int OnGroupingParamChanged(Guid NewGroupingParam, Guid EventContext)
     {
-        try { Target.OnGroupingParamChanged(NewGroupingParam, EventContext); return S_OK; }
-        catch (Exception ex) { return Marshal.GetHRForException(ex); }
+        try
+        {
+            Target.OnGroupingParamChanged(_session.ToSessionInfo(), NewGroupingParam, EventContext);
+            return S_OK;
+        }
+        catch (Exception ex)
+        {
+            return Marshal.GetHRForException(ex);
+        }
     }
 
     public int OnStateChanged(AudioSessionState NewState)
     {
-        try { Target.OnStateChanged(NewState); return S_OK; }
-        catch (Exception ex) { return Marshal.GetHRForException(ex); }
+        try
+        {
+            Target.OnStateChanged(_session.ToSessionInfo(), NewState);
+            return S_OK;
+        }
+        catch (Exception ex)
+        {
+            return Marshal.GetHRForException(ex);
+        }
     }
 
     public int OnSessionDisconnected(AudioSessionDisconnectReason DisconnectReason)
     {
-        try { Target.OnSessionDisconnected(DisconnectReason); return S_OK; }
-        catch (Exception ex) { return Marshal.GetHRForException(ex); }
+        try
+        {
+            Target.OnSessionDisconnected(_session.ToSessionInfo(), DisconnectReason);
+            return S_OK;
+        }
+        catch (Exception ex)
+        {
+            return Marshal.GetHRForException(ex);
+        }
+    }
+}
+
+/// <summary>
+/// Token returned by <see cref="AudioSessionControl.RegisterAudioSessionNotification"/>. Disposing it
+/// unregisters exactly the registration it represents; safe to dispose more than once.
+/// </summary>
+internal sealed class SessionEventsRegistration : IDisposable
+{
+    private AudioSessionControl _owner;
+    private readonly AudioSessionEventsComAdapter _adapter;
+
+    internal SessionEventsRegistration(AudioSessionControl owner, AudioSessionEventsComAdapter adapter)
+    {
+        _owner = owner;
+        _adapter = adapter;
+    }
+
+    public void Dispose()
+    {
+        AudioSessionControl owner = Interlocked.Exchange(ref _owner, null);
+        owner?.RemoveRegistration(_adapter);
     }
 }
 

@@ -37,8 +37,7 @@ public class AudioEndpointVolumeChannels
     {
         get
         {
-            int result;
-            Marshal.ThrowExceptionForHR(_AudioEndPointVolume.GetChannelCount(out result));
+            Marshal.ThrowExceptionForHR(_AudioEndPointVolume.GetChannelCount(out var result));
             return result;
         }
     }
@@ -60,6 +59,4 @@ public class AudioEndpointVolumeChannels
             _Channels[i] = new AudioEndpointVolumeChannel(_AudioEndPointVolume, i);
         }
     }
-
-
 }

@@ -20,21 +20,32 @@
   3. This notice may not be removed or altered from any source distribution.
 */
 
+using System;
 using System.Runtime.InteropServices;
 using AudioDeviceLib.CoreAudioApi.Interfaces;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
 /// <summary>A collection of the <see cref="AudioSessionControl"/> sessions on an audio endpoint.</summary>
-public class SessionCollection
+/// <remarks>
+/// The underlying <c>IAudioSessionEnumerator</c> is a point-in-time snapshot with a fixed count,
+/// so this collection memoizes one <see cref="AudioSessionControl"/> per index: repeated access to
+/// the same index returns the same instance (important for registering and later unregistering
+/// session notifications on the same object).
+/// </remarks>
+public class SessionCollection : IDisposable
 {
-    IAudioSessionEnumerator _AudioSessionEnumerator;
+    private readonly IAudioSessionEnumerator _AudioSessionEnumerator;
+    private readonly object _lock = new object();
+    private AudioSessionControl[] _cache;
+    private bool _disposed;
+
     internal SessionCollection(IAudioSessionEnumerator realEnumerator)
     {
         _AudioSessionEnumerator = realEnumerator;
     }
 
-    /// <summary>Gets the session at the specified zero-based index.</summary>
+    /// <summary>Gets the session at the specified zero-based index (cached per index).</summary>
     /// <param name="index">The zero-based index of the session (0 to <see cref="Count"/> - 1).</param>
     /// <returns>The <see cref="AudioSessionControl"/> at the requested position.</returns>
     /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
@@ -42,8 +53,28 @@ public class SessionCollection
     {
         get
         {
-            Marshal.ThrowExceptionForHR(_AudioSessionEnumerator.GetSession(index, out var _Result));
-            return new AudioSessionControl(_Result);
+            lock (_lock)
+            {
+                if (_disposed)
+                {
+                    throw new ObjectDisposedException(nameof(SessionCollection));
+                }
+
+                _cache ??= new AudioSessionControl[CountCore()];
+
+                if (index < 0 || index >= _cache.Length)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(index));
+                }
+
+                if (_cache[index] == null)
+                {
+                    Marshal.ThrowExceptionForHR(_AudioSessionEnumerator.GetSession(index, out var _Result));
+                    _cache[index] = new AudioSessionControl(_Result);
+                }
+
+                return _cache[index];
+            }
         }
     }
 
@@ -53,8 +84,46 @@ public class SessionCollection
     {
         get
         {
-            Marshal.ThrowExceptionForHR(_AudioSessionEnumerator.GetCount(out var result));
-            return result;
+            lock (_lock)
+            {
+                if (_disposed)
+                {
+                    throw new ObjectDisposedException(nameof(SessionCollection));
+                }
+
+                return _cache?.Length ?? CountCore();
+            }
+        }
+    }
+
+    private int CountCore()
+    {
+        Marshal.ThrowExceptionForHR(_AudioSessionEnumerator.GetCount(out var result));
+        return result;
+    }
+
+    /// <summary>Disposes every <see cref="AudioSessionControl"/> this collection created.</summary>
+    public void Dispose()
+    {
+        AudioSessionControl[] toDispose;
+        lock (_lock)
+        {
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+            toDispose = _cache;
+            _cache = null;
+        }
+
+        if (toDispose != null)
+        {
+            foreach (AudioSessionControl session in toDispose)
+            {
+                session?.Dispose();
+            }
         }
     }
 }

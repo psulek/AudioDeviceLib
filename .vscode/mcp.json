@@ -1,0 +1,9 @@
+{
+  "servers": {
+    "memorylens": {
+      "type": "stdio",
+      "command": "dnx",
+      "args": ["MemoryLens.Mcp", "--yes"]
+    }
+  }
+}

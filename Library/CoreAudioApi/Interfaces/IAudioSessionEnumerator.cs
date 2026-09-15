@@ -28,6 +28,6 @@ namespace AudioDeviceLib.CoreAudioApi.Interfaces;
  InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 internal interface IAudioSessionEnumerator
 {
-    int GetCount( out int SessionCount);
-    int GetSession( int SessionCount,out IAudioSessionControl2 Session );
+    int GetCount(out int SessionCount);
+    int GetSession(int SessionCount, out IAudioSessionControl2 Session);
 }

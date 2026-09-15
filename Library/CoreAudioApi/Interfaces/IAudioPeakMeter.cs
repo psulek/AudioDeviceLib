@@ -28,6 +28,6 @@ namespace AudioDeviceLib.CoreAudioApi.Interfaces;
  InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 internal interface IAudioPeakMeter
 {
-    int GetChannelCount( out int pcChannels);
-    int GetLevel( int Channel, out float level);
+    int GetChannelCount(out int pcChannels);
+    int GetLevel(int Channel, out float level);
 }

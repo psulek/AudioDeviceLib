@@ -39,8 +39,7 @@ public class PropertyStore
     {
         get
         {
-            int Result;
-            Marshal.ThrowExceptionForHR(_Store.GetCount(out Result));
+            Marshal.ThrowExceptionForHR(_Store.GetCount(out var Result));
             return Result;
         }
     }
@@ -53,9 +52,8 @@ public class PropertyStore
     {
         get
         {
-            PropVariant result;
             PropertyKey key = Get(index);
-            Marshal.ThrowExceptionForHR(_Store.GetValue(ref key, out result));
+            Marshal.ThrowExceptionForHR(_Store.GetValue(ref key, out PropVariant result));
             return new PropertyStoreProperty(key, result);
         }
     }
@@ -73,6 +71,7 @@ public class PropertyStore
                 return true;
             }
         }
+
         return false;
     }
 
@@ -84,16 +83,16 @@ public class PropertyStore
     {
         get
         {
-            PropVariant result;
             for (int i = 0; i < Count; i++)
             {
                 PropertyKey key = Get(i);
                 if (key.fmtid == guid)
                 {
-                    Marshal.ThrowExceptionForHR(_Store.GetValue(ref key, out result));
+                    Marshal.ThrowExceptionForHR(_Store.GetValue(ref key, out PropVariant result));
                     return new PropertyStoreProperty(key, result);
                 }
             }
+
             return null;
         }
     }
@@ -104,8 +103,7 @@ public class PropertyStore
     /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public PropertyKey Get(int index)
     {
-        PropertyKey key;
-        Marshal.ThrowExceptionForHR( _Store.GetAt(index, out key));
+        Marshal.ThrowExceptionForHR(_Store.GetAt(index, out PropertyKey key));
         return key;
     }
 
@@ -115,9 +113,8 @@ public class PropertyStore
     /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public PropVariant GetValue(int index)
     {
-        PropVariant result;
         PropertyKey key = Get(index);
-        Marshal.ThrowExceptionForHR(_Store.GetValue(ref key, out result));
+        Marshal.ThrowExceptionForHR(_Store.GetValue(ref key, out PropVariant result));
         return result;
     }
 
@@ -134,6 +131,7 @@ public class PropertyStore
                 return true;
             }
         }
+
         return false;
     }
 
@@ -145,16 +143,16 @@ public class PropertyStore
     {
         get
         {
-            PropVariant result;
             for (int i = 0; i < Count; i++)
             {
                 PropertyKey key = Get(i);
                 if (key.fmtid == queryKey.fmtid && key.pid == queryKey.pid)
                 {
-                    Marshal.ThrowExceptionForHR(_Store.GetValue(ref key, out result));
+                    Marshal.ThrowExceptionForHR(_Store.GetValue(ref key, out PropVariant result));
                     return new PropertyStoreProperty(key, result);
                 }
             }
+
             return null;
         }
     }

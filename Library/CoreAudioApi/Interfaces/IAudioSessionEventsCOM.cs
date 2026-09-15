@@ -34,23 +34,24 @@ namespace AudioDeviceLib.CoreAudioApi.Interfaces;
 internal interface IAudioSessionEventsCOM
 {
     [PreserveSig]
-    int OnDisplayNameChanged( [MarshalAs(UnmanagedType.LPWStr)] string NewDisplayName, Guid EventContext );
+    int OnDisplayNameChanged([MarshalAs(UnmanagedType.LPWStr)] string NewDisplayName, Guid EventContext);
 
     [PreserveSig]
-    int OnIconPathChanged(  [MarshalAs(UnmanagedType.LPWStr)] string NewIconPath, Guid EventContext );
+    int OnIconPathChanged([MarshalAs(UnmanagedType.LPWStr)] string NewIconPath, Guid EventContext);
 
     [PreserveSig]
-    int OnSimpleVolumeChanged( float NewVolume,bool newMute, Guid EventContext );
+    int OnSimpleVolumeChanged(float NewVolume, bool newMute, Guid EventContext);
 
     [PreserveSig]
-    int OnChannelVolumeChanged( UInt32 ChannelCount,  IntPtr NewChannelVolumeArray, UInt32 ChangedChannel, Guid EventContext );
+    int OnChannelVolumeChanged(UInt32 ChannelCount, IntPtr NewChannelVolumeArray, UInt32 ChangedChannel,
+        Guid EventContext);
 
     [PreserveSig]
-    int OnGroupingParamChanged( Guid NewGroupingParam, Guid EventContext );
+    int OnGroupingParamChanged(Guid NewGroupingParam, Guid EventContext);
 
     [PreserveSig]
-    int OnStateChanged( AudioSessionState NewState);
+    int OnStateChanged(AudioSessionState NewState);
 
     [PreserveSig]
-    int OnSessionDisconnected( AudioSessionDisconnectReason DisconnectReason);
+    int OnSessionDisconnected(AudioSessionDisconnectReason DisconnectReason);
 }
