@@ -9,7 +9,9 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
+using AudioDeviceLib.CoreAudioApi;
 using AudioDeviceLib.Lib;
 
 namespace AudioDeviceLib.Test;
@@ -27,7 +29,8 @@ internal static class Program
             return 0;
         }
 
-        string command = args[0].ToLowerInvariant();
+        // Commands are bare words (e.g. "watch"); also accept a leading --/-// prefix (e.g. "--watch").
+        string command = args[0].TrimStart('-', '/').ToLowerInvariant();
         var opts = ParseOptions(args.Skip(1).ToArray());
 
         try
@@ -40,6 +43,7 @@ internal static class Program
                 case "set":     return CmdSet(audio, opts);
                 case "volume":  return CmdVolume(audio, opts);
                 case "mute":    return CmdMute(audio, opts);
+                case "watch":   return CmdWatch(audio, opts);
                 default:
                     Console.Error.WriteLine("Unknown command: " + command);
                     Console.Error.WriteLine("Run '" + Exe + " --help' for usage.");
@@ -105,11 +109,11 @@ internal static class Program
 
         if (dev == null)
         {
-            Console.WriteLine(string.Format("No default {0} {1} device is set.", kind, role));
+            Console.WriteLine($"No default {kind} {role} device is set.");
             return 0;
         }
 
-        Console.WriteLine(string.Format("Default {0} {1} device:", kind, role));
+        Console.WriteLine($"Default {kind} {role} device:");
         PrintDevice(dev);
         return 0;
     }
@@ -129,7 +133,7 @@ internal static class Program
         }
 
         audio.SetDefaultDevice(target, role);
-        Console.WriteLine(string.Format("Set default ({0}):", role));
+        Console.WriteLine($"Set default ({role}):");
         // Re-read so the printed default flags reflect the change.
         AudioDevice updated = audio.GetDevices().FirstOrDefault(d => d.Id == target.Id) ?? target;
         PrintDevice(updated);
@@ -147,7 +151,7 @@ internal static class Program
         string setVal = o.Get("set");
         if (setVal == null)
         {
-            Console.WriteLine(string.Format("{0}: volume {1:0}%", target.Name, target.GetVolumePercent()));
+            Console.WriteLine($"{target.Name}: volume {target.GetVolumePercent():0}%");
             return 0;
         }
 
@@ -160,7 +164,7 @@ internal static class Program
         }
 
         target.SetVolumePercent(pct);
-        Console.WriteLine(string.Format("{0}: volume set to {1:0}%", target.Name, target.GetVolumePercent()));
+        Console.WriteLine($"{target.Name}: volume set to {target.GetVolumePercent():0}%");
         return 0;
     }
 
@@ -175,7 +179,7 @@ internal static class Program
         string setVal = o.Get("set");
         if (setVal == null)
         {
-            Console.WriteLine(string.Format("{0}: muted={1}", target.Name, target.IsMuted));
+            Console.WriteLine($"{target.Name}: muted={target.IsMuted}");
             return 0;
         }
 
@@ -199,7 +203,86 @@ internal static class Program
                 return 1;
         }
 
-        Console.WriteLine(string.Format("{0}: muted={1}", target.Name, target.IsMuted));
+        Console.WriteLine($"{target.Name}: muted={target.IsMuted}");
+        return 0;
+    }
+
+    // Registers a logging IAudioSessionEvents on every session of the chosen device and
+    // waits. Change an app's volume/mute (e.g. in the Windows volume mixer) to see callbacks.
+    private static int CmdWatch(AudioController audio, Options o)
+    {
+        // Route Debug.WriteLine output to the console so the events are visible when run normally.
+        if (!Debugger.IsAttached)
+        {
+            Trace.Listeners.Add(new ConsoleTraceListener());
+        }
+
+        // Device: use the selector if one was given, otherwise the default playback device.
+        AudioDevice device;
+        bool hasSelector = o.Get("name") != null || o.Get("id") != null || o.Get("index") != null;
+        if (hasSelector)
+        {
+            device = ResolveSelector(audio, o);
+            if (device == null)
+            {
+                return 1;
+            }
+        }
+        else
+        {
+            device = audio.GetDefaultPlaybackDevice();
+            if (device == null)
+            {
+                Console.Error.WriteLine("No default playback device to watch.");
+                return 1;
+            }
+        }
+
+        Console.WriteLine("Watching audio sessions on: " + device.Name);
+
+        // 1) Per-session events (the app / "System sounds" sliders in the mixer).
+        SessionCollection sessions = device.Device.AudioSessionManager.Sessions;
+        var registered = new List<AudioSessionControl>();
+        var loggers = new List<SessionEventsLogger>();
+
+        for (int i = 0; i < sessions.Count; i++)
+        {
+            AudioSessionControl session = sessions[i];
+
+            string tag;
+            try { tag = session.DisplayName; } catch { tag = null; }
+            if (string.IsNullOrEmpty(tag))
+            {
+                tag = "session#" + i;
+            }
+
+            var logger = new SessionEventsLogger(tag);
+            session.RegisterAudioSessionNotification(logger);
+            registered.Add(session);
+            loggers.Add(logger);
+        }
+
+        // 2) Endpoint (device master) volume events (the "System -> Volume" slider).
+        //    This is a separate notification path (IAudioEndpointVolume), so subscribe to it too.
+        AudioEndpointVolume endpointVolume = device.Device.AudioEndpointVolume;
+        AudioEndpointVolumeNotificationDelegate endpointHandler = data =>
+            Console.WriteLine(
+                $"[endpoint: {device.Name}] master={data.MasterVolume:P0} muted={data.Muted} channels={data.Channels}");
+        endpointVolume.OnVolumeNotification += endpointHandler;
+
+        Console.WriteLine(
+            $"Registered on {registered.Count} session(s) + endpoint master volume. " +
+            "Change app or system volume/mute in the Windows mixer to see events. Press Enter to stop.");
+        Console.ReadLine();
+
+        endpointVolume.OnVolumeNotification -= endpointHandler;
+        for (int i = 0; i < registered.Count; i++)
+        {
+            try { registered[i].UnregisterAudioSessionNotification(loggers[i]); }
+            catch { /* best-effort cleanup */ }
+        }
+
+        Console.WriteLine("Unregistered. Done.");
         return 0;
     }
 
@@ -326,12 +409,12 @@ internal static class Program
 
     private static void PrintDevice(AudioDevice d)
     {
-        Console.WriteLine(string.Format("  Index : {0}", d.Index));
-        Console.WriteLine(string.Format("  Name  : {0}", d.Name));
-        Console.WriteLine(string.Format("  Kind  : {0}", d.Kind));
-        Console.WriteLine(string.Format("  ID    : {0}", d.Id));
-        Console.WriteLine(string.Format("  Default: {0}   DefaultComm: {1}", d.IsDefault, d.IsDefaultCommunication));
-        Console.WriteLine(string.Format("  Volume: {0:0}%   Muted: {1}", d.GetVolumePercent(), d.IsMuted));
+        Console.WriteLine($"  Index : {d.Index}");
+        Console.WriteLine($"  Name  : {d.Name}");
+        Console.WriteLine($"  Kind  : {d.Kind}");
+        Console.WriteLine($"  ID    : {d.Id}");
+        Console.WriteLine($"  Default: {d.IsDefault}   DefaultComm: {d.IsDefaultCommunication}");
+        Console.WriteLine($"  Volume: {d.GetVolumePercent():0}%   Muted: {d.IsMuted}");
     }
 
     // ---- Tiny option parser -------------------------------------------------------
@@ -435,6 +518,7 @@ COMMANDS:
   set        Set the default device
   volume     Get or set a device's volume
   mute       Get, set or toggle a device's mute state
+  watch      Log audio session events (IAudioSessionEvents) for a device
   help       Show this help
 
 SELECTORS (for set / volume / mute - pick exactly one):
@@ -456,6 +540,7 @@ OPTIONS:
   set       <selector> [role]
   volume    <selector> [--set <0..100>]       (omit --set to just read)
   mute      <selector> [--set <on|off|toggle>] (omit --set to just read)
+  watch     [<selector>]                       (default: default playback device)
 
 EXAMPLES:
   " + Exe + @" list
@@ -470,6 +555,8 @@ EXAMPLES:
   " + Exe + @" volume --name Speakers
   " + Exe + @" volume --name Speakers --set 50
   " + Exe + @" mute --name Speakers --set toggle
+  " + Exe + @" watch
+  " + Exe + @" watch --name Speakers
 
 EXIT CODES:
   0  success

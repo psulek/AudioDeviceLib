@@ -25,40 +25,32 @@ using System.Runtime.InteropServices;
 
 namespace AudioDeviceLib.CoreAudioApi.Interfaces;
 
-[Guid("bfb7ff88-7239-4fc9-8fa2-07c950be9c6d"),
+// Raw COM sink contract for IAudioSessionEvents (mmdeviceapi / audiopolicy).
+// This is the interop-shaped interface (PreserveSig HRESULTs, MarshalAs, raw pointers) and is
+// kept internal. Library consumers implement the pure-C# AudioDeviceLib.CoreAudioApi.IAudioSessionEvents
+// instead; AudioSessionEventsComAdapter bridges the two.
+[Guid("24918ACC-64B3-37C1-8CA9-74A66E9957A8"),
  InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-interface IAudioSessionControl2
+internal interface IAudioSessionEventsCOM
 {
-    //IAudioSession functions
     [PreserveSig]
-    int GetState(out AudioSessionState state);
-    [PreserveSig]
-    int GetDisplayName(out IntPtr name);
-    [PreserveSig]
-    int SetDisplayName(string value, Guid EventContext);
-    [PreserveSig]
-    int GetIconPath(out IntPtr Path);
-    [PreserveSig]
-    int SetIconPath(string Value, Guid EventContext);
-    [PreserveSig]
-    int GetGroupingParam(out Guid GroupingParam);
-    [PreserveSig]
-    int SetGroupingParam(Guid Override, Guid Eventcontext);
-    [PreserveSig]
-    int RegisterAudioSessionNotification(IAudioSessionEventsCOM NewNotifications);
-    [PreserveSig]
-    int UnregisterAudioSessionNotification(IAudioSessionEventsCOM NewNotifications);
-    //IAudioSession2 functions
-    [PreserveSig]
-    int GetSessionIdentifier( out IntPtr retVal);
-    [PreserveSig]
-    int GetSessionInstanceIdentifier( out IntPtr retVal);
-    [PreserveSig]
-    int GetProcessId( out UInt32 retvVal);
-    [PreserveSig]
-    int IsSystemSoundsSession();
-    [PreserveSig]
-    int SetDuckingPreference( bool optOut);
+    int OnDisplayNameChanged( [MarshalAs(UnmanagedType.LPWStr)] string NewDisplayName, Guid EventContext );
 
+    [PreserveSig]
+    int OnIconPathChanged(  [MarshalAs(UnmanagedType.LPWStr)] string NewIconPath, Guid EventContext );
 
+    [PreserveSig]
+    int OnSimpleVolumeChanged( float NewVolume,bool newMute, Guid EventContext );
+
+    [PreserveSig]
+    int OnChannelVolumeChanged( UInt32 ChannelCount,  IntPtr NewChannelVolumeArray, UInt32 ChangedChannel, Guid EventContext );
+
+    [PreserveSig]
+    int OnGroupingParamChanged( Guid NewGroupingParam, Guid EventContext );
+
+    [PreserveSig]
+    int OnStateChanged( AudioSessionState NewState);
+
+    [PreserveSig]
+    int OnSessionDisconnected( AudioSessionDisconnectReason DisconnectReason);
 }

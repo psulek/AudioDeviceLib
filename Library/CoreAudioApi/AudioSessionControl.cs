@@ -21,6 +21,7 @@
 */
 
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using AudioDeviceLib.CoreAudioApi.Interfaces;
 
@@ -35,6 +36,12 @@ public class AudioSessionControl
     internal IAudioSessionControl2 _AudioSessionControl;
     internal AudioMeterInformation _AudioMeterInformation;
     internal SimpleAudioVolume _SimpleAudioVolume;
+
+    // Maps each registered consumer to the COM adapter created for it, so Unregister can pass the
+    // identical sink object back to COM and so the adapter's CCW stays alive while registered.
+    private readonly Dictionary<IAudioSessionEvents, AudioSessionEventsComAdapter> _adapters
+        = new Dictionary<IAudioSessionEvents, AudioSessionEventsComAdapter>(AudioSessionEventsRefComparer.Instance);
+    private readonly object _adaptersLock = new object();
 
     /// <summary>Gets the peak-meter information for this session, or <c>null</c> if unsupported.</summary>
     public AudioMeterInformation AudioMeterInformation => _AudioMeterInformation;
@@ -60,19 +67,59 @@ public class AudioSessionControl
     }
 
     /// <summary>Registers a callback to receive session change notifications.</summary>
-    /// <param name="eventConsumer">The consumer that will receive <c>IAudioSessionEvents</c> callbacks.</param>
+    /// <param name="eventConsumer">The consumer that will receive <see cref="IAudioSessionEvents"/> callbacks.</param>
+    /// <exception cref="System.ArgumentNullException">Thrown when <paramref name="eventConsumer"/> is null.</exception>
     /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
+    /// <remarks>
+    /// THREADING: the consumer's callbacks are raised by Windows Core Audio on arbitrary, non-UI
+    /// threads and may arrive concurrently, so the implementation must be fast and thread-safe.
+    /// Pass the same instance to <see cref="UnregisterAudioSessionNotification"/> to stop
+    /// receiving notifications; keep a reference to it until then.
+    /// </remarks>
     public void RegisterAudioSessionNotification(IAudioSessionEvents eventConsumer)
     {
-        Marshal.ThrowExceptionForHR(_AudioSessionControl.RegisterAudioSessionNotification(eventConsumer));
+        if (eventConsumer == null)
+        {
+            throw new ArgumentNullException(nameof(eventConsumer));
+        }
+
+        AudioSessionEventsComAdapter adapter;
+        lock (_adaptersLock)
+        {
+            if (!_adapters.TryGetValue(eventConsumer, out adapter))
+            {
+                adapter = new AudioSessionEventsComAdapter(eventConsumer);
+                _adapters[eventConsumer] = adapter;
+            }
+        }
+
+        Marshal.ThrowExceptionForHR(_AudioSessionControl.RegisterAudioSessionNotification(adapter));
     }
 
     /// <summary>Unregisters a previously registered session change callback.</summary>
-    /// <param name="eventConsumer">The consumer that was passed to <see cref="RegisterAudioSessionNotification"/>.</param>
+    /// <param name="eventConsumer">The same consumer instance that was passed to <see cref="RegisterAudioSessionNotification"/>.</param>
+    /// <exception cref="System.ArgumentNullException">Thrown when <paramref name="eventConsumer"/> is null.</exception>
     /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
+    /// <remarks>Has no effect if the instance was not previously registered on this session.</remarks>
     public void UnregisterAudioSessionNotification(IAudioSessionEvents eventConsumer)
     {
-        Marshal.ThrowExceptionForHR(_AudioSessionControl.UnregisterAudioSessionNotification(eventConsumer));
+        if (eventConsumer == null)
+        {
+            throw new ArgumentNullException(nameof(eventConsumer));
+        }
+
+        AudioSessionEventsComAdapter adapter;
+        lock (_adaptersLock)
+        {
+            if (!_adapters.TryGetValue(eventConsumer, out adapter))
+            {
+                return;
+            }
+
+            _adapters.Remove(eventConsumer);
+        }
+
+        Marshal.ThrowExceptionForHR(_AudioSessionControl.UnregisterAudioSessionNotification(adapter));
     }
 
     /// <summary>Gets the current activity state of the session (inactive, active or expired).</summary>

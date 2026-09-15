@@ -42,8 +42,7 @@ public class SessionCollection
     {
         get
         {
-            IAudioSessionControl2 _Result;
-            Marshal.ThrowExceptionForHR(_AudioSessionEnumerator.GetSession(index, out _Result));
+            Marshal.ThrowExceptionForHR(_AudioSessionEnumerator.GetSession(index, out var _Result));
             return new AudioSessionControl(_Result);
         }
     }
@@ -54,9 +53,8 @@ public class SessionCollection
     {
         get
         {
-            int result;
-            Marshal.ThrowExceptionForHR(_AudioSessionEnumerator.GetCount(out result));
-            return (int)result;
+            Marshal.ThrowExceptionForHR(_AudioSessionEnumerator.GetCount(out var result));
+            return result;
         }
     }
 }
