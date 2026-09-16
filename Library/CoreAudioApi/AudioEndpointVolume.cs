@@ -20,6 +20,25 @@
   3. This notice may not be removed or altered from any source distribution.
 */
 
+/*
+  MODIFICATIONS
+  -------------
+  This file is an ALTERED version of the original source by Ray Molenkamp and must not be
+  misrepresented as being the original source code. Altered by Peter Šulek for AudioDeviceLib
+  (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
+  AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
+
+  Changes from the original:
+  - Namespace changed to `AudioDeviceLib.CoreAudioApi` (file-scoped); unused `using`
+    directives removed.
+  - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
+    documentation comments.
+  - Disposal reworked: added a `Dispose(bool)` pattern with `GC.SuppressFinalize`, routed the
+    finalizer through it, and made `UnregisterControlChangeNotify` best-effort so no exception
+    can escape `Dispose` (throwing from the finalizer thread would crash the process).
+  - `EEndpointHardwareSupport` renamed to `EndpointHardwareSupport`.
+*/
+
 using System;
 using System.Runtime.InteropServices;
 using AudioDeviceLib.CoreAudioApi.Interfaces;
@@ -125,8 +144,6 @@ public class AudioEndpointVolume : IDisposable
         }
     }
 
-    #region IDisposable Members
-
     /// <summary>Unregisters the volume-change notification callback. Safe to call more than once.</summary>
     public void Dispose()
     {
@@ -160,6 +177,4 @@ public class AudioEndpointVolume : IDisposable
     {
         Dispose(false);
     }
-
-    #endregion
 }

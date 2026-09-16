@@ -20,6 +20,30 @@
   3. This notice may not be removed or altered from any source distribution.
 */
 
+/*
+  MODIFICATIONS
+  -------------
+  This file is an ALTERED version of the original source by Ray Molenkamp and must not be
+  misrepresented as being the original source code. Altered by Peter Šulek for AudioDeviceLib
+  (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
+  AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
+
+  Changes from the original:
+  - Namespace changed to `AudioDeviceLib.CoreAudioApi` (file-scoped); unused `using`
+    directives removed.
+  - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
+    documentation comments.
+  - `RegisterAudioSessionNotification` now accepts the library's pure-C# `IAudioSessionEvents`,
+    wraps it in an `AudioSessionEventsComAdapter` and returns an `IDisposable` registration
+    token. Registrations are tracked per consumer (by reference identity), so the same consumer
+    yields the same token and the identical sink object is handed back to COM on unregister.
+  - The class now implements `IDisposable` and unregisters every outstanding sink on disposal.
+  - Added the internal `ToSessionInfo()`, which builds an immutable `AudioSessionInfo` snapshot
+    tolerant of failing HRESULTs, so callbacks never receive the live COM object.
+  - The COM string getters were funnelled through a shared `TryGetString` helper that frees the
+    native buffer and can return `null` instead of throwing.
+*/
+
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;

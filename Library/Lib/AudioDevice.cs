@@ -25,9 +25,6 @@ namespace AudioDeviceLib.Lib;
 /// </remarks>
 public sealed class AudioDevice : IDisposable
 {
-    /// <summary>1-based position in the enumeration of all active endpoints.</summary>
-    public int Index { get; }
-
     /// <summary>True if this endpoint is the current default device for its kind (multimedia role).</summary>
     public bool IsDefault { get; internal set; }
 
@@ -46,14 +43,13 @@ public sealed class AudioDevice : IDisposable
     /// <summary>The underlying Core Audio device, for advanced scenarios.</summary>
     public MMDevice Device { get; }
 
-    internal AudioDevice(int index, MMDevice baseDevice, bool isDefault, bool isDefaultCommunication)
+    internal AudioDevice(MMDevice baseDevice, bool isDefault, bool isDefaultCommunication)
     {
         if (baseDevice == null)
         {
             throw new ArgumentNullException(nameof(baseDevice));
         }
 
-        Index = index;
         IsDefault = isDefault;
         IsDefaultCommunication = isDefaultCommunication;
         Kind = baseDevice.DataFlow == DataFlow.Capture ? AudioDeviceKind.Recording : AudioDeviceKind.Playback;
@@ -67,7 +63,7 @@ public sealed class AudioDevice : IDisposable
     /// A snapshot carrying this device's <see cref="Index"/>, default flags, <see cref="Kind"/>,
     /// <see cref="Name"/> and <see cref="Id"/>, safe to keep after this <see cref="AudioDevice"/> is disposed.
     /// </returns>
-    public AudioDeviceInfo ToDeviceInfo() => new AudioDeviceInfo(Index, IsDefault, IsDefaultCommunication, Kind, Name, Id);
+    // public AudioDeviceInfo ToDeviceInfo() => new AudioDeviceInfo(Index, IsDefault, IsDefaultCommunication, Kind, Name, Id);
 
     /// <summary>Master volume as a percentage in the range 0..100.</summary>
     /// <returns>The current master volume scalar expressed as a percentage between 0 and 100.</returns>
@@ -128,10 +124,7 @@ public sealed class AudioDevice : IDisposable
     /// </returns>
     public override string ToString()
     {
-        return string.Format("[{0}] {1} ({2}){3}{4}",
-            Index, Name, Kind,
-            IsDefault ? " [Default]" : string.Empty,
-            IsDefaultCommunication ? " [DefaultComm]" : string.Empty);
+        return $"{Name} ({Kind}){(IsDefault ? " [Default]" : string.Empty)}{(IsDefaultCommunication ? " [DefaultComm]" : string.Empty)}";
     }
 
     /// <summary>Disposes the underlying <see cref="MMDevice"/>, releasing any Core Audio callbacks it holds.</summary>

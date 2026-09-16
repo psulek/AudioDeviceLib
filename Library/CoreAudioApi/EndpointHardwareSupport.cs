@@ -20,6 +20,24 @@
   3. This notice may not be removed or altered from any source distribution.
 */
 
+/*
+  MODIFICATIONS
+  -------------
+  This file is an ALTERED version of the original source by Ray Molenkamp and must not be
+  misrepresented as being the original source code. Altered by Peter Šulek for AudioDeviceLib
+  (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
+  AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
+  Derived from `SOURCE/EEndpointHardwareSupport.cs` upstream.
+
+  Changes from the original:
+  - Namespace changed to `AudioDeviceLib.CoreAudioApi` (file-scoped); unused `using`
+    directives removed.
+  - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
+    documentation comments.
+  - Enum renamed from `EEndpointHardwareSupport` to `EndpointHardwareSupport`; an `All` member
+    combining volume, mute and meter was added.
+*/
+
 using System;
 
 namespace AudioDeviceLib.CoreAudioApi;

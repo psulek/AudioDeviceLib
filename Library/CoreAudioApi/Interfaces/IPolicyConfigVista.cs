@@ -1,4 +1,19 @@
-﻿using System;
+﻿/*
+  MODIFICATIONS
+  -------------
+  This file is an ALTERED version of the corresponding source in AudioDeviceCmdlets
+  (https://github.com/frgnca/AudioDeviceCmdlets, MIT) and must not be misrepresented as being
+  the original source code. Altered by Peter Šulek for AudioDeviceLib
+  (https://github.com/psulek/AudioDeviceLib).
+
+  Changes from the original:
+  - Namespace changed to `AudioDeviceLib.CoreAudioApi.Interfaces` (file-scoped); unused `using`
+    directives removed.
+  - Reformatted to the project's C# style (full braces, modern C# syntax).
+  - `ERole` renamed to `Role`.
+*/
+
+using System;
 using System.Runtime.InteropServices;
 
 namespace AudioDeviceLib.CoreAudioApi.Interfaces;

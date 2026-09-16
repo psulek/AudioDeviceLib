@@ -87,17 +87,11 @@ internal static class Program
             return;
         }
 
-        Console.WriteLine("Idx  Kind       Def  Comm  Name, ID");
-        Console.WriteLine("---  ---------  ---  ----  --------------------------------------");
+        Console.WriteLine("Kind       Def  Comm  Name, ID");
+        Console.WriteLine("---------  ---  ----  --------------------------------------");
         foreach (var d in devices)
         {
-            Console.WriteLine("{0,3}  {1,-9}  {2,-3}  {3,-4}  {4}, {5}",
-                d.Index,
-                d.Kind,
-                d.IsDefault ? "*" : "",
-                d.IsDefaultCommunication ? "*" : "",
-                d.Name,
-                d.Id);
+            Console.WriteLine($"{d.Kind,-9}  {(d.IsDefault ? "*" : ""),-3}  {(d.IsDefaultCommunication ? "*" : ""),-4}  {d.Name}, {d.Id}");
         }
     }
 
@@ -226,7 +220,7 @@ internal static class Program
 
         // Device: use the selector if one was given, otherwise the default playback device.
         AudioDevice device;
-        bool hasSelector = o.Get("name") != null || o.Get("id") != null || o.Get("index") != null;
+        bool hasSelector = o.Get("name") != null || o.Get("id") != null;
         if (hasSelector)
         {
             device = ResolveSelector(audio, o);
@@ -245,7 +239,7 @@ internal static class Program
             }
         }
 
-        Console.WriteLine($"Watching audio sessions on: {device.Index}: {device.Name}, ID={device.Id}");
+        Console.WriteLine($"Watching audio sessions on:  {device.Name}, ID={device.Id}");
 
         // 1) Per-session events (the app / "System sounds" sliders in the mixer).
         SessionCollection sessions = device.Device.AudioSessionManager.Sessions;
@@ -293,7 +287,7 @@ internal static class Program
 
     // ---- Selector / role helpers --------------------------------------------------
 
-    // Resolves a device from --name / --id / --index (+ --recording for name/index scope).
+    // Resolves a device from --name / --id (+ --recording to scope --name).
     private static AudioDevice ResolveSelector(AudioController audio, Options o)
     {
         bool recording = o.Has("recording");
@@ -301,17 +295,16 @@ internal static class Program
 
         string id = o.Get("id");
         string name = o.Get("name");
-        string indexStr = o.Get("index");
 
-        int provided = (id != null ? 1 : 0) + (name != null ? 1 : 0) + (indexStr != null ? 1 : 0);
+        int provided = (id != null ? 1 : 0) + (name != null ? 1 : 0);
         if (provided == 0)
         {
-            Console.Error.WriteLine("Missing selector. Use one of: --name <substr> | --id <id> | --index <n>");
+            Console.Error.WriteLine("Missing selector. Use one of: --name <substr> | --id <id>");
             return null;
         }
         if (provided > 1)
         {
-            Console.Error.WriteLine("Use only one selector (--name, --id or --index).");
+            Console.Error.WriteLine("Use only one selector (--name or --id).");
             return null;
         }
 
@@ -324,20 +317,6 @@ internal static class Program
             if (match == null)
             {
                 Console.Error.WriteLine("No device found with ID: " + id);
-            }
-        }
-        else if (indexStr != null)
-        {
-            if (!int.TryParse(indexStr, out var idx))
-            {
-                Console.Error.WriteLine("Invalid index: " + indexStr);
-                return null;
-            }
-            // Index is the 1-based position from the full 'list'.
-            match = audio.GetDevices().FirstOrDefault(d => d.Index == idx);
-            if (match == null)
-            {
-                Console.Error.WriteLine("No device found with index: " + idx);
             }
         }
         else
@@ -413,7 +392,6 @@ internal static class Program
 
     private static void PrintDevice(AudioDevice d)
     {
-        Console.WriteLine($"  Index : {d.Index}");
         Console.WriteLine($"  Name  : {d.Name}");
         Console.WriteLine($"  Kind  : {d.Kind}");
         Console.WriteLine($"  ID    : {d.Id}");
@@ -527,8 +505,7 @@ COMMANDS:
 SELECTORS (for set / volume / mute - pick exactly one):
   --name <substr>   Match by name, case-insensitive substring (e.g. Speakers, Realtek)
   --id <id>         Match by exact endpoint ID
-  --index <n>       Match by 1-based index shown in 'list'
-  --recording       Scope --name/--index to recording devices (default: playback)
+  --recording       Scope --name to recording devices (default: playback)
 
 ROLE (for set - which Windows default role(s) to assign; combinable flags):
   --role <r>        one or more of: console | multimedia | communications | default | all
@@ -552,7 +529,7 @@ EXAMPLES:
   " + Exe + @" default --comm
   " + Exe + @" set --name Speakers
   " + Exe + @" set --name Realtek --default-only
-  " + Exe + @" set --index 3 --role all
+  " + Exe + @" set --id ""{0.0.0.00000000}.{guid}"" --role all
   " + Exe + @" set --name Speakers --role console+multimedia
   " + Exe + @" set --recording --name Microphone
   " + Exe + @" volume --name Speakers

@@ -20,6 +20,26 @@
   3. This notice may not be removed or altered from any source distribution.
 */
 
+/*
+  MODIFICATIONS
+  -------------
+  This file is an ALTERED version of the original source by Ray Molenkamp and must not be
+  misrepresented as being the original source code. Altered by Peter Šulek for AudioDeviceLib
+  (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
+  AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
+  Derived from `SOURCE/EDeviceState.cs` upstream.
+
+  Changes from the original:
+  - Namespace changed to `AudioDeviceLib.CoreAudioApi` (file-scoped); unused `using`
+    directives removed.
+  - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
+    documentation comments.
+  - Enum renamed from `EDeviceState` to `DeviceState`; members renamed from `DEVICE_STATE_*` /
+    `DEVICE_STATEMASK_ALL` to `Active`/`NotPresent`/`Unplugged`/`All`.
+  - Values corrected against the Windows SDK (`mmdeviceapi.h`): `Unplugged` is `0x8` (was `0x2`),
+    the missing `Disabled` (`0x2`) was added, and `All` is `0xF` (was `0x7`).
+*/
+
 using System;
 
 namespace AudioDeviceLib.CoreAudioApi;

@@ -49,10 +49,19 @@ SOFTWARE.
 - Copyright (c) 2007-2010 Ray Molenkamp
 - License: zlib/libpng-style permissive license.
 
-All files under `CoreAudioApi/` and `CoreAudioApi/Interfaces/` carry this notice.
-Per condition 2 of that license, note that these files are **redistributed as part of
-a derived work (AudioDeviceLib)**; the source files themselves are unmodified copies
-taken from AudioDeviceCmdlets.
+All files under `CoreAudioApi/` and `CoreAudioApi/Interfaces/` that originate from this
+work carry the notice below.
+
+Per condition 2 of that license: **every one of these files has been altered** and none is
+an unmodified copy. Each altered file carries a `MODIFICATIONS` block directly beneath the
+license notice, listing the changes made to it. The alterations range from namespace and
+formatting changes through renamed types and enum members to reworked disposal, caching and
+notification-registration behaviour. Nothing here may be taken as the original source code.
+
+The four `PolicyConfig` interop files (`PolicyConfigClient.cs`, `Interfaces/IPolicyConfig.cs`,
+`Interfaces/IPolicyConfig10.cs`, `Interfaces/IPolicyConfigVista.cs`) carry no license header
+upstream either; they are covered by the AudioDeviceCmdlets MIT license above and are likewise
+marked as altered.
 
 ```
 Copyright (C) 2007-2010 Ray Molenkamp

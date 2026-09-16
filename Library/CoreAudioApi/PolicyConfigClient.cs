@@ -1,4 +1,21 @@
-﻿using System.Runtime.InteropServices;
+﻿/*
+  MODIFICATIONS
+  -------------
+  This file is an ALTERED version of the corresponding source in AudioDeviceCmdlets
+  (https://github.com/frgnca/AudioDeviceCmdlets, MIT) and must not be misrepresented as being
+  the original source code. Altered by Peter Šulek for AudioDeviceLib
+  (https://github.com/psulek/AudioDeviceLib).
+
+  Changes from the original:
+  - Namespace changed to `AudioDeviceLib.CoreAudioApi` (file-scoped); unused `using`
+    directives removed.
+  - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
+    documentation comments.
+  - The nested `_PolicyConfigClient` COM class was lifted to namespace scope.
+  - `ERole` renamed to `Role`.
+*/
+
+using System.Runtime.InteropServices;
 using AudioDeviceLib.CoreAudioApi.Interfaces;
 
 namespace AudioDeviceLib.CoreAudioApi;

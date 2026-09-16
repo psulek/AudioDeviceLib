@@ -20,6 +20,23 @@
   3. This notice may not be removed or altered from any source distribution.
 */
 
+/*
+  MODIFICATIONS
+  -------------
+  This file is an ALTERED version of the original source by Ray Molenkamp and must not be
+  misrepresented as being the original source code. Altered by Peter Šulek for AudioDeviceLib
+  (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
+  AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
+  Derived from `SOURCE/eStgmAccess.cs` upstream.
+
+  Changes from the original:
+  - Namespace changed to `AudioDeviceLib.CoreAudioApi.Interfaces` (file-scoped); unused `using`
+    directives removed.
+  - Reformatted to the project's C# style (full braces, modern C# syntax).
+  - Renamed from `eStgmAccess.cs` / `EStgmAccess` to `StgmAccess`; members `STGM_READ`/
+    `STGM_WRITE`/`STGM_READWRITE` renamed to `Read`/`Write`/`ReadWrite`.
+*/
+
 namespace AudioDeviceLib.CoreAudioApi.Interfaces;
 
 internal enum StgmAccess

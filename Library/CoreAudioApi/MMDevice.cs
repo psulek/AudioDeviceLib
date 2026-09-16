@@ -20,6 +20,25 @@
   3. This notice may not be removed or altered from any source distribution.
 */
 
+/*
+  MODIFICATIONS
+  -------------
+  This file is an ALTERED version of the original source by Ray Molenkamp and must not be
+  misrepresented as being the original source code. Altered by Peter Šulek for AudioDeviceLib
+  (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
+  AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
+
+  Changes from the original:
+  - Namespace changed to `AudioDeviceLib.CoreAudioApi` (file-scoped); unused `using`
+    directives removed.
+  - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
+    documentation comments.
+  - Now implements `IDisposable`, disposing the lazily-activated `AudioEndpointVolume` and
+    `AudioSessionManager`.
+  - Fields renamed to camelCase, `_realDevice` made `readonly`, and the `#region` blocks removed.
+  - `EStgmAccess`/`EDataFlow`/`EDeviceState` renamed to `StgmAccess`/`DataFlow`/`DeviceState`.
+*/
+
 using System;
 using System.Runtime.InteropServices;
 using AudioDeviceLib.CoreAudioApi.Interfaces;
@@ -32,25 +51,15 @@ namespace AudioDeviceLib.CoreAudioApi;
 /// </summary>
 public class MMDevice : IDisposable
 {
-    #region Variables
-
     private readonly IMMDevice _realDevice;
     private PropertyStore _propertyStore;
     private AudioMeterInformation _audioMeterInformation;
     private AudioEndpointVolume _audioEndpointVolume;
     private AudioSessionManager _audioSessionManager;
 
-    #endregion
-
-    #region Guids
-
     private static Guid IID_IAudioMeterInformation = typeof(IAudioMeterInformation).GUID;
     private static Guid IID_IAudioEndpointVolume = typeof(IAudioEndpointVolume).GUID;
     private static Guid IID_IAudioSessionManager = typeof(IAudioSessionManager2).GUID;
-
-    #endregion
-
-    #region Init
 
     private void GetPropertyInformation()
     {
@@ -78,10 +87,6 @@ public class MMDevice : IDisposable
             out var result));
         _audioEndpointVolume = new AudioEndpointVolume(result as IAudioEndpointVolume);
     }
-
-    #endregion
-
-    #region Properties
 
     /// <summary>Gets the audio session manager for this endpoint (activated on first access).</summary>
     /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the interface cannot be activated.</exception>
@@ -196,18 +201,10 @@ public class MMDevice : IDisposable
         }
     }
 
-    #endregion
-
-    #region Constructor
-
     internal MMDevice(IMMDevice realDevice)
     {
         _realDevice = realDevice;
     }
-
-    #endregion
-
-    #region IDisposable
 
     /// <summary>
     /// Disposes the lazily-activated sub-interfaces that hold registered COM callbacks or cached
@@ -221,6 +218,4 @@ public class MMDevice : IDisposable
         _audioSessionManager?.Dispose();
         _audioSessionManager = null;
     }
-
-    #endregion
 }

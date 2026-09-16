@@ -62,29 +62,92 @@ public sealed class AudioController : IDisposable
     /// flags or pass <see cref="DeviceState.All"/> to include disabled, not-present and unplugged endpoints too.
     /// </param>
     /// <returns>
-    /// A read-only list of the matching <see cref="AudioDevice"/> endpoints. Each device is tagged with
-    /// its 1-based <see cref="AudioDevice.Index"/> and whether it is the current default / default
-    /// communications device. The list is empty if no endpoints match.
+    /// A read-only list of the matching <see cref="AudioDevice"/> endpoints. The list is empty if no endpoints match.
     /// </returns>
     public IReadOnlyList<AudioDevice> GetDevices(DataFlow flow = DataFlow.All, DeviceState state = DeviceState.Active)
     {
-        var devices = _enumerator.EnumerateAudioEndPoints(flow, state);
+        return GetDevicesInternal(flow, state);
+    }
 
+    /// <summary>
+    /// Returns the endpoint with the given ID, or null if no such endpoint exists.
+    /// </summary>
+    /// <param name="deviceId"> The ID of the endpoint to return. </param>
+    /// <returns> The endpoint with the given ID, or null if no such endpoint exists. </returns>
+    /// <exception cref="ArgumentNullException"> If <paramref name="deviceId"/> is null or empty. </exception>
+    public AudioDevice GetDeviceById(string deviceId)
+    {
+        if (string.IsNullOrEmpty(deviceId))
+        {
+            throw new ArgumentNullException(nameof(deviceId));
+        }
+
+        var devices = GetDevicesInternal(deviceId: deviceId);
+        return devices.FirstOrDefault();
+    }
+    
+    private class DeviceDefaultIds
+    {
+        public string DefaultPlaybackId;
+        public string DefaultRecordingId;
+        public string CommPlaybackId;
+        public string CommRecordingId;
+        
+        public bool IsDefault(MMDevice device)
+        {
+            return device.ID == DefaultPlaybackId || device.ID == DefaultRecordingId;
+        }
+        
+        public bool IsDefaultComm(MMDevice device)
+        {
+            return device.ID == CommPlaybackId || device.ID == CommRecordingId;
+        }
+    }
+
+    private DeviceDefaultIds GetDeviceDefaults(DataFlow flow)
+    {
         var allowRender = flow == DataFlow.Render || flow == DataFlow.All;
         var allowCapture = flow == DataFlow.Capture || flow == DataFlow.All;
+        return new DeviceDefaultIds
+        {
+            DefaultPlaybackId = allowRender ? TryGetDefaultId(DataFlow.Render, Role.Multimedia) : null,
+            DefaultRecordingId = allowCapture ? TryGetDefaultId(DataFlow.Capture, Role.Multimedia) : null,
+            CommPlaybackId = allowRender ? TryGetDefaultId(DataFlow.Render, Role.Communications) : null,
+            CommRecordingId = allowCapture ? TryGetDefaultId(DataFlow.Capture, Role.Communications) : null,
+        };
+    }
 
-        var defaultPlaybackId = allowRender ? TryGetDefaultId(DataFlow.Render, Role.Multimedia) : null;
-        var defaultRecordingId = allowCapture ? TryGetDefaultId(DataFlow.Capture, Role.Multimedia) : null;
-        var commPlaybackId = allowRender ? TryGetDefaultId(DataFlow.Render, Role.Communications) : null;
-        var commRecordingId = allowCapture ? TryGetDefaultId(DataFlow.Capture, Role.Communications) : null;
+    private IReadOnlyList<AudioDevice> GetDevicesInternal(DataFlow flow = DataFlow.All,
+        DeviceState state = DeviceState.Active,
+        string deviceId = null)
+    {
+        // var allowRender = flow == DataFlow.Render || flow == DataFlow.All;
+        // var allowCapture = flow == DataFlow.Capture || flow == DataFlow.All;
 
+        // var defaultPlaybackId = allowRender ? TryGetDefaultId(DataFlow.Render, Role.Multimedia) : null;
+        // var defaultRecordingId = allowCapture ? TryGetDefaultId(DataFlow.Capture, Role.Multimedia) : null;
+        // var commPlaybackId = allowRender ? TryGetDefaultId(DataFlow.Render, Role.Communications) : null;
+        // var commRecordingId = allowCapture ? TryGetDefaultId(DataFlow.Capture, Role.Communications) : null;
+        var deviceDefaults = GetDeviceDefaults(flow);
+
+        if (!string.IsNullOrEmpty(deviceId))
+        {
+            var device = _enumerator.GetDevice(deviceId);
+            if (device != null)
+            {
+                return new List<AudioDevice>(1)
+                {
+                    new AudioDevice(device, deviceDefaults.IsDefault(device), deviceDefaults.IsDefaultComm(device))
+                };
+            }
+        }
+
+        var devices = _enumerator.EnumerateAudioEndPoints(flow, state);
         var result = new List<AudioDevice>(devices.Count);
         for (var i = 0; i < devices.Count; i++)
         {
-            using var device = devices[i];
-            var isDefault = device.ID == defaultPlaybackId || device.ID == defaultRecordingId;
-            var isDefaultComm = device.ID == commPlaybackId || device.ID == commRecordingId;
-            result.Add(new AudioDevice(i + 1, device, isDefault, isDefaultComm));
+            var device = devices[i];
+            result.Add(new AudioDevice(device, deviceDefaults.IsDefault(device), deviceDefaults.IsDefaultComm(device)));
         }
 
         return result;
@@ -209,25 +272,23 @@ public sealed class AudioController : IDisposable
     private AudioDevice GetDefault(DataFlow flow, bool communications)
     {
         var role = communications ? Role.Communications : Role.Multimedia;
-        MMDevice mm;
+        MMDevice device;
         try
         {
-            mm = _enumerator.GetDefaultAudioEndpoint(flow, role);
-            
-            // _enumerator.GetDefaultAudioEndpointDeviceId(flow, role);
+            device = _enumerator.GetDefaultAudioEndpoint(flow, role);
         }
         catch
         {
             return null;
         }
-
-        if (mm == null)
+        
+        if (device == null)
         {
             return null;
         }
 
-        // Locate it in the full enumeration so Index and the default flags are accurate.
-        return GetDevices().FirstOrDefault(d => d.Id == mm.ID);
+        var deviceDefaults = GetDeviceDefaults(flow);
+        return new AudioDevice(device, deviceDefaults.IsDefault(device), deviceDefaults.IsDefaultComm(device));
     }
 
     private string TryGetDefaultId(DataFlow flow, Role role)

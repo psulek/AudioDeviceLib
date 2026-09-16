@@ -20,6 +20,27 @@
   3. This notice may not be removed or altered from any source distribution.
 */
 
+/*
+  MODIFICATIONS
+  -------------
+  This file is an ALTERED version of the original source by Ray Molenkamp and must not be
+  misrepresented as being the original source code. Altered by Peter Šulek for AudioDeviceLib
+  (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
+  AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
+
+  Changes from the original:
+  - Namespace changed to `AudioDeviceLib.CoreAudioApi` (file-scoped); unused `using`
+    directives removed.
+  - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
+    documentation comments.
+  - The class and its members were changed from `public` to `internal`.
+  - Added `GetDefaultAudioEndpointDeviceId`, which returns the default endpoint's ID string
+    without constructing an `MMDevice` wrapper.
+  - Added `RegisterEndpointNotificationCallback` / `UnregisterEndpointNotificationCallback`,
+    forwarding a typed `IMMNotificationClient` to the underlying enumerator.
+  - `EDataFlow`/`EDeviceState`/`ERole` renamed to `DataFlow`/`DeviceState`/`Role`.
+*/
+
 using System;
 using System.Runtime.InteropServices;
 using AudioDeviceLib.CoreAudioApi.Interfaces;
