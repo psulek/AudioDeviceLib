@@ -41,7 +41,7 @@ public class PolicyConfigClient
     /// <param name="devID">The Core Audio endpoint ID to make default.</param>
     /// <param name="eRole">The role (console, multimedia or communications) to assign.</param>
     /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying policy-config call fails.</exception>
-    public void SetDefaultEndpoint(string devID, ERole eRole)
+    public void SetDefaultEndpoint(string devID, Role eRole)
     {
         if (_PolicyConfig != null)
         {

@@ -20,11 +20,26 @@
   3. This notice may not be removed or altered from any source distribution.
 */
 
-namespace AudioDeviceLib.CoreAudioApi.Interfaces;
+using System;
 
-internal enum EStgmAccess
+namespace AudioDeviceLib.CoreAudioApi;
+
+/// <summary>Bit flags describing the state of an audio endpoint, matching the native <c>DEVICE_STATE_*</c> constants.</summary>
+[Flags]
+public enum DeviceState : uint
 {
-    STGM_READ = 0x00000000,
-    STGM_WRITE = 0x00000001,
-    STGM_READWRITE = 0x00000002
+    /// <summary>The endpoint is active and available for use.</summary>
+    Active = 0x00000001,
+
+    /// <summary>The endpoint is disabled (turned off in the Windows sound control panel).</summary>
+    Disabled = 0x00000002,
+
+    /// <summary>The endpoint device is not present (e.g. removed).</summary>
+    NotPresent = 0x00000004,
+
+    /// <summary>The endpoint is present but its audio jack is unplugged.</summary>
+    Unplugged = 0x00000008,
+
+    /// <summary>Mask matching endpoints in any state.</summary>
+    All = Active | Disabled | NotPresent | Unplugged
 }

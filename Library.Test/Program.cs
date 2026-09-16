@@ -75,10 +75,16 @@ internal static class Program
             devices = audio.GetDevices();
         }
 
+        RenderDevices(devices);
+        return 0;
+    }
+
+    private static void RenderDevices(IReadOnlyList<AudioDevice> devices)
+    {
         if (devices.Count == 0)
         {
             Console.WriteLine("(no active devices)");
-            return 0;
+            return;
         }
 
         Console.WriteLine("Idx  Kind       Def  Comm  Name, ID");
@@ -93,7 +99,6 @@ internal static class Program
                 d.Name,
                 d.Id);
         }
-        return 0;
     }
 
     private static int CmdDefault(AudioController audio, Options o)
@@ -216,6 +221,9 @@ internal static class Program
             Trace.Listeners.Add(new ConsoleTraceListener());
         }
 
+        var devices = audio.GetDevices();
+        RenderDevices(devices);
+
         // Device: use the selector if one was given, otherwise the default playback device.
         AudioDevice device;
         bool hasSelector = o.Get("name") != null || o.Get("id") != null || o.Get("index") != null;
@@ -237,7 +245,7 @@ internal static class Program
             }
         }
 
-        Console.WriteLine("Watching audio sessions on: " + device.Name);
+        Console.WriteLine($"Watching audio sessions on: {device.Index}: {device.Name}, ID={device.Id}");
 
         // 1) Per-session events (the app / "System sounds" sliders in the mixer).
         SessionCollection sessions = device.Device.AudioSessionManager.Sessions;
@@ -261,11 +269,17 @@ internal static class Program
                 $"[endpoint: {device.Name}] master={data.MasterVolume:P0} muted={data.Muted} channels={data.Channels}");
         endpointVolume.OnVolumeNotification += endpointHandler;
 
+        // 3) Device (endpoint) change events, incl. default / default-communications device changes.
+        //    This is registered on the controller (IMMNotificationClient), independent of any device.
+        IDisposable deviceRegistration = audio.RegisterDeviceNotification(new AudioDeviceLogger());
+
         Console.WriteLine(
-            $"Registered on {registrations.Count} session(s) + endpoint master volume. " +
-            "Change app or system volume/mute in the Windows mixer to see events. Press Enter to stop.");
+            $"Registered on {registrations.Count} session(s) + endpoint master volume + device events. " +
+            "Change app/system volume/mute in the mixer, or switch the default device in Sound settings, " +
+            "to see events. Press Enter to stop.");
         Console.ReadLine();
 
+        deviceRegistration.Dispose();
         endpointVolume.OnVolumeNotification -= endpointHandler;
         foreach (IDisposable registration in registrations)
         {
@@ -507,7 +521,7 @@ COMMANDS:
   set        Set the default device
   volume     Get or set a device's volume
   mute       Get, set or toggle a device's mute state
-  watch      Log audio session events (IAudioSessionEvents) for a device
+  watch      Log session, endpoint-volume and device (default-change) events for a device
   help       Show this help
 
 SELECTORS (for set / volume / mute - pick exactly one):

@@ -20,20 +20,23 @@
   3. This notice may not be removed or altered from any source distribution.
 */
 
+using System;
+
 namespace AudioDeviceLib.CoreAudioApi;
 
-/// <summary>The device role used to resolve or assign a default endpoint, matching the native <c>ERole</c>.</summary>
-public enum ERole
+/// <summary>Bit flags describing which functions an endpoint supports in hardware, matching the native <c>ENDPOINT_HARDWARE_SUPPORT_*</c> constants.</summary>
+[Flags]
+public enum EndpointHardwareSupport
 {
-    /// <summary>Games, system notification sounds and voice commands.</summary>
-    eConsole = 0,
+    /// <summary>The endpoint supports a hardware volume control.</summary>
+    Volume = 0x00000001,
 
-    /// <summary>Music, movies, narration and live-music recording.</summary>
-    eMultimedia = 1,
+    /// <summary>The endpoint supports a hardware mute control.</summary>
+    Mute = 0x00000002,
 
-    /// <summary>Voice communications (e.g. talking to another person).</summary>
-    eCommunications = 2,
+    /// <summary>The endpoint supports a hardware peak meter.</summary>
+    Meter = 0x00000004,
 
-    /// <summary>The number of defined role values (not a real role).</summary>
-    ERole_enum_count = 3
+    /// <summary>All hardware functions (volume, mute and meter) combined.</summary>
+    All = Volume | Mute | Meter
 }

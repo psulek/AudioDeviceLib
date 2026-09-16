@@ -20,23 +20,17 @@
   3. This notice may not be removed or altered from any source distribution.
 */
 
-using System;
-
 namespace AudioDeviceLib.CoreAudioApi;
 
-/// <summary>Bit flags describing the state of an audio endpoint, matching the native <c>DEVICE_STATE_*</c> constants.</summary>
-[Flags]
-public enum EDeviceState : uint
+/// <summary>The device role used to resolve or assign a default endpoint, matching the native <c>ERole</c>.</summary>
+public enum Role
 {
-    /// <summary>The endpoint is active and available for use.</summary>
-    DEVICE_STATE_ACTIVE = 0x00000001,
+    /// <summary>Games, system notification sounds and voice commands.</summary>
+    Console = 0,
 
-    /// <summary>The endpoint is present but its audio jack is unplugged.</summary>
-    DEVICE_STATE_UNPLUGGED = 0x00000002,
+    /// <summary>Music, movies, narration and live-music recording.</summary>
+    Multimedia = 1,
 
-    /// <summary>The endpoint device is not present (e.g. removed).</summary>
-    DEVICE_STATE_NOTPRESENT = 0x00000004,
-
-    /// <summary>Mask matching endpoints in any state.</summary>
-    DEVICE_STATEMASK_ALL = 0x00000007
+    /// <summary>Voice communications (e.g. talking to another person).</summary>
+    Communications = 2
 }

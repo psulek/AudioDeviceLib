@@ -32,4 +32,10 @@ public struct PropertyKey
 
     /// <summary>The property identifier within the property set identified by <see cref="fmtid"/>.</summary>
     public int pid;
+
+    /// <summary>
+    /// A friendly, human-readable name for well-known audio property keys (e.g.
+    /// <c>Device.FriendlyName</c>), or a <c>"{fmtid}/{pid}"</c> fallback when the key is not recognized.
+    /// </summary>
+    public readonly string Name => PropertyKeyNames.GetName(this);
 };

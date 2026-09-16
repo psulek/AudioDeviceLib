@@ -36,7 +36,7 @@ public class AudioEndpointVolume : IDisposable
     private AudioEndpointVolumeChannels _Channels;
     private AudioEndpointVolumeStepInformation _StepInformation;
     private AudioEndPointVolumeVolumeRange _VolumeRange;
-    private EEndpointHardwareSupport _HardwareSupport;
+    private EndpointHardwareSupport _HardwareSupport;
     private AudioEndpointVolumeCallback _CallBack;
 
     /// <summary>Raised when the endpoint volume or mute state changes.</summary>
@@ -46,7 +46,7 @@ public class AudioEndpointVolume : IDisposable
     public AudioEndPointVolumeVolumeRange VolumeRange => _VolumeRange;
 
     /// <summary>Gets the hardware functions (volume, mute, meter) natively supported by the endpoint.</summary>
-    public EEndpointHardwareSupport HardwareSupport => _HardwareSupport;
+    public EndpointHardwareSupport HardwareSupport => _HardwareSupport;
 
     /// <summary>Gets the number of discrete volume steps and the current step for the endpoint.</summary>
     public AudioEndpointVolumeStepInformation StepInformation => _StepInformation;
@@ -110,7 +110,7 @@ public class AudioEndpointVolume : IDisposable
         _Channels = new AudioEndpointVolumeChannels(_AudioEndPointVolume);
         _StepInformation = new AudioEndpointVolumeStepInformation(_AudioEndPointVolume);
         Marshal.ThrowExceptionForHR(_AudioEndPointVolume.QueryHardwareSupport(out var HardwareSupp));
-        _HardwareSupport = (EEndpointHardwareSupport)HardwareSupp;
+        _HardwareSupport = (EndpointHardwareSupport)HardwareSupp;
         _VolumeRange = new AudioEndPointVolumeVolumeRange(_AudioEndPointVolume);
         _CallBack = new AudioEndpointVolumeCallback(this);
         Marshal.ThrowExceptionForHR(_AudioEndPointVolume.RegisterControlChangeNotify(_CallBack));
@@ -152,6 +152,10 @@ public class AudioEndpointVolume : IDisposable
         }
     }
 
+    /// <summary>
+    /// Finalizer safety net: unregisters the volume-change callback if <see cref="Dispose()"/> was
+    /// never called. Prefer disposing deterministically.
+    /// </summary>
     ~AudioEndpointVolume()
     {
         Dispose(false);

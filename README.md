@@ -173,16 +173,57 @@ Disposing the owning `AudioDevice` (or `AudioSessionControl`) also unregisters a
 still-active callbacks as a safety net, so the tokens are the deterministic path and
 disposal is the backstop.
 
+## Device notifications
+
+To be told when endpoints are added/removed, change state, or when the **default device**
+(including the default **communications** device) changes, register an `IAudioDeviceEvents`
+consumer on the controller. Like session notifications, registration returns an `IDisposable`
+token; disposing it (or the controller) unregisters.
+
+```csharp
+using AudioDeviceLib;
+using AudioDeviceLib.CoreAudioApi;
+
+sealed class DeviceLogger : IAudioDeviceEvents
+{
+    public void OnDefaultDeviceChanged(DataFlow flow, Role role, string defaultDeviceId)
+    {
+        // role distinguishes the communications default from the console/multimedia default;
+        // defaultDeviceId is null when there is no longer a default for this flow/role.
+        Console.WriteLine($"default {flow}/{role} -> {defaultDeviceId ?? "(none)"}");
+    }
+
+    // The remaining IAudioDeviceEvents members can be left as no-ops.
+    public void OnDeviceStateChanged(string deviceId, DeviceState newState) { }
+    public void OnDeviceAdded(string deviceId) { }
+    public void OnDeviceRemoved(string deviceId) { }
+    public void OnPropertyValueChanged(string deviceId, PropertyKey key) { }
+}
+```
+
+```csharp
+using var audio = new AudioController();
+
+using (IDisposable token = audio.RegisterDeviceNotification(new DeviceLogger()))
+{
+    // ...callbacks fire here (on arbitrary, non-UI threads)...
+} // token.Dispose() unregisters
+```
+
+> **Threading:** callbacks arrive on arbitrary, non-UI threads and may be concurrent. Keep
+> handlers fast and thread-safe, and don't register/unregister or dispose the controller from
+> inside a callback.
+
 ## Default-role semantics
 
 Windows tracks three independent default-device roles. `DefaultRole` is a `[Flags]`
-enum, so you can combine them; each set flag maps to one native `ERole` assignment.
+enum, so you can combine them; each set flag maps to one `Role` assignment.
 
-| Flag | Native role | Notes |
-|------|-------------|-------|
-| `Console` | `eConsole` | System sounds, games, voice commands |
-| `Multimedia` | `eMultimedia` | Music and movies. Matches `-DefaultOnly` |
-| `Communications` | `eCommunications` | Voice chat. Matches `-CommunicationOnly` |
+| Flag | Maps to (`Role`) | Notes |
+|------|------------------|-------|
+| `Console` | `Role.Console` | System sounds, games, voice commands |
+| `Multimedia` | `Role.Multimedia` | Music and movies. Matches `-DefaultOnly` |
+| `Communications` | `Role.Communications` | Voice chat. Matches `-CommunicationOnly` |
 | `Default` (= `Multimedia \| Communications`) | both | The default; matches `Set-AudioDevice` with no switch |
 | `All` (= `Console \| Multimedia \| Communications`) | all three | Make this THE default for everything |
 

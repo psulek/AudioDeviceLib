@@ -38,7 +38,7 @@ internal interface IPolicyConfigVista
     int SetPropertyValue(string pszDeviceName, bool bFxStore, IntPtr key, IntPtr pv);
 
     [PreserveSig]
-    int SetDefaultEndpoint(string pszDeviceName, ERole role);
+    int SetDefaultEndpoint(string pszDeviceName, Role role);
 
     [PreserveSig]
     int SetEndpointVisibility(string pszDeviceName, bool bVisible);

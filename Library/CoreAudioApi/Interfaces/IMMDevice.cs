@@ -34,11 +34,11 @@ internal interface IMMDevice
         [MarshalAs(UnmanagedType.IUnknown)] out object ppInterface);
 
     [PreserveSig]
-    int OpenPropertyStore(EStgmAccess stgmAccess, out IPropertyStore propertyStore);
+    int OpenPropertyStore(StgmAccess stgmAccess, out IPropertyStore propertyStore);
 
     [PreserveSig]
     int GetId([MarshalAs(UnmanagedType.LPWStr)] out string ppstrId);
 
     [PreserveSig]
-    int GetState(out EDeviceState pdwState);
+    int GetState(out DeviceState pdwState);
 }

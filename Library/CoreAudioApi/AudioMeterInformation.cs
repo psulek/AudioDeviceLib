@@ -32,14 +32,14 @@ namespace AudioDeviceLib.CoreAudioApi;
 public class AudioMeterInformation
 {
     private IAudioMeterInformation _AudioMeterInformation;
-    private EEndpointHardwareSupport _HardwareSupport;
+    private EndpointHardwareSupport _HardwareSupport;
     private AudioMeterInformationChannels _Channels;
 
     internal AudioMeterInformation(IAudioMeterInformation realInterface)
     {
         _AudioMeterInformation = realInterface;
         Marshal.ThrowExceptionForHR(_AudioMeterInformation.QueryHardwareSupport(out var HardwareSupp));
-        _HardwareSupport = (EEndpointHardwareSupport)HardwareSupp;
+        _HardwareSupport = (EndpointHardwareSupport)HardwareSupp;
         _Channels = new AudioMeterInformationChannels(_AudioMeterInformation);
     }
 
@@ -47,7 +47,7 @@ public class AudioMeterInformation
     public AudioMeterInformationChannels PeakValues => _Channels;
 
     /// <summary>Gets the hardware functions (volume, mute, meter) natively supported by the endpoint.</summary>
-    public EEndpointHardwareSupport HardwareSupport => _HardwareSupport;
+    public EndpointHardwareSupport HardwareSupport => _HardwareSupport;
 
     /// <summary>Gets the current master peak sample value in the range 0.0 to 1.0.</summary>
     /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>

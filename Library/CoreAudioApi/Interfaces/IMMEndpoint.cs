@@ -29,5 +29,5 @@ namespace AudioDeviceLib.CoreAudioApi.Interfaces;
 internal interface IMMEndpoint
 {
     [PreserveSig]
-    int GetDataFlow(out EDataFlow pDataFlow);
+    int GetDataFlow(out DataFlow pDataFlow);
 };

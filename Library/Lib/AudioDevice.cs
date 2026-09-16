@@ -56,12 +56,17 @@ public sealed class AudioDevice : IDisposable
         Index = index;
         IsDefault = isDefault;
         IsDefaultCommunication = isDefaultCommunication;
-        Kind = baseDevice.DataFlow == EDataFlow.eCapture ? AudioDeviceKind.Recording : AudioDeviceKind.Playback;
+        Kind = baseDevice.DataFlow == DataFlow.Capture ? AudioDeviceKind.Recording : AudioDeviceKind.Playback;
         Name = baseDevice.FriendlyName;
         Id = baseDevice.ID;
         Device = baseDevice;
     }
     
+    /// <summary>Creates an immutable <see cref="AudioDeviceInfo"/> snapshot of this device's identifying data.</summary>
+    /// <returns>
+    /// A snapshot carrying this device's <see cref="Index"/>, default flags, <see cref="Kind"/>,
+    /// <see cref="Name"/> and <see cref="Id"/>, safe to keep after this <see cref="AudioDevice"/> is disposed.
+    /// </returns>
     public AudioDeviceInfo ToDeviceInfo() => new AudioDeviceInfo(Index, IsDefault, IsDefaultCommunication, Kind, Name, Id);
 
     /// <summary>Master volume as a percentage in the range 0..100.</summary>
@@ -97,6 +102,11 @@ public sealed class AudioDevice : IDisposable
         get => Device.AudioEndpointVolume.Mute;
         set => Device.AudioEndpointVolume.Mute = value;
     }
+    
+    /// <summary>
+    /// Gets the current state of the endpoint.
+    /// </summary>
+    public DeviceState State => Device.State;
 
     /// <summary>Inverts the current mute state.</summary>
     public void ToggleMute()

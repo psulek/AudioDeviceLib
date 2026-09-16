@@ -1,5 +1,14 @@
 namespace AudioDeviceLib.Lib;
 
+/// <summary>
+/// An immutable snapshot of an <see cref="AudioDevice"/>'s identifying information, detached from the
+/// live Core Audio COM object. Create one with <see cref="AudioDevice.ToDeviceInfo"/>.
+/// </summary>
+/// <remarks>
+/// All properties are captured when the snapshot is taken and never change, so an instance is safe to
+/// read from any thread, keep, or store — including after the originating <see cref="AudioDevice"/>
+/// has been disposed.
+/// </remarks>
 public sealed class AudioDeviceInfo
 {
     /// <summary>1-based position in the enumeration of all active endpoints.</summary>

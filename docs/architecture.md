@@ -24,6 +24,7 @@ classDiagram
         +SetDefaultDevice(string deviceId, DefaultRole roles) void
         +SetDefaultPlaybackByName(string name, DefaultRole roles) AudioDevice
         +SetDefaultRecordingByName(string name, DefaultRole roles) AudioDevice
+        +RegisterDeviceNotification(IAudioDeviceEvents consumer) IDisposable
         +Dispose() void
     }
 
@@ -44,8 +45,8 @@ classDiagram
     }
 
     class MMDeviceEnumerator {
-        +EnumerateAudioEndPoints(EDataFlow, EDeviceState) MMDeviceCollection
-        +GetDefaultAudioEndpoint(EDataFlow, ERole) MMDevice
+        +EnumerateAudioEndPoints(DataFlow, DeviceState) MMDeviceCollection
+        +GetDefaultAudioEndpoint(DataFlow, Role) MMDevice
         +GetDevice(string ID) MMDevice
     }
 
@@ -56,8 +57,8 @@ classDiagram
         +PropertyStore Properties
         +string FriendlyName
         +string ID
-        +EDataFlow DataFlow
-        +EDeviceState State
+        +DataFlow DataFlow
+        +DeviceState State
         +Dispose() void
     }
 
@@ -95,7 +96,7 @@ classDiagram
     }
 
     class PolicyConfigClient {
-        +SetDefaultEndpoint(string deviceId, ERole role) void
+        +SetDefaultEndpoint(string deviceId, Role role) void
     }
 
     class DefaultRole {

@@ -27,19 +27,19 @@ public enum AudioDeviceKind
 /// Which Windows default-device role(s) to assign when setting a default device.
 /// This is a bit flag: the three real Windows roles (<see cref="Console"/>,
 /// <see cref="Multimedia"/>, <see cref="Communications"/>) can be combined, and each
-/// set flag maps to one native <c>ERole</c> call. <see cref="Default"/> and
+/// set flag maps to one native <c>Role</c> call. <see cref="Default"/> and
 /// <see cref="All"/> are convenience combinations.
 /// </summary>
 [Flags]
 public enum DefaultRole
 {
-    /// <summary>Console role (system sounds, games, voice commands) — native <c>eConsole</c>.</summary>
+    /// <summary>Console role (system sounds, games, voice commands) — maps to <c>Role.Console</c>.</summary>
     Console = 1,
 
-    /// <summary>Multimedia role (music, movies) — native <c>eMultimedia</c>. Matches <c>-DefaultOnly</c>.</summary>
+    /// <summary>Multimedia role (music, movies) — maps to <c>Role.Multimedia</c>. Matches <c>-DefaultOnly</c>.</summary>
     Multimedia = 2,
 
-    /// <summary>Communications role (voice chat) — native <c>eCommunications</c>. Matches <c>-CommunicationOnly</c>.</summary>
+    /// <summary>Communications role (voice chat) — maps to <c>Role.Communications</c>. Matches <c>-CommunicationOnly</c>.</summary>
     Communications = 4,
 
     /// <summary>

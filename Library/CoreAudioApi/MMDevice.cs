@@ -54,7 +54,7 @@ public class MMDevice : IDisposable
 
     private void GetPropertyInformation()
     {
-        Marshal.ThrowExceptionForHR(_realDevice.OpenPropertyStore(EStgmAccess.STGM_READ, out var propstore));
+        Marshal.ThrowExceptionForHR(_realDevice.OpenPropertyStore(StgmAccess.Read, out var propstore));
         _propertyStore = new PropertyStore(propstore);
     }
 
@@ -175,7 +175,7 @@ public class MMDevice : IDisposable
     }
 
     /// <summary>Gets the data-flow direction of the endpoint (render or capture).</summary>
-    public EDataFlow DataFlow
+    public DataFlow DataFlow
     {
         get
         {
@@ -187,7 +187,7 @@ public class MMDevice : IDisposable
 
     /// <summary>Gets the current state of the endpoint (active, disabled, not present or unplugged).</summary>
     /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
-    public EDeviceState State
+    public DeviceState State
     {
         get
         {

@@ -23,17 +23,14 @@
 namespace AudioDeviceLib.CoreAudioApi;
 
 /// <summary>The data-flow direction of an audio endpoint, matching the native <c>EDataFlow</c>.</summary>
-public enum EDataFlow
+public enum DataFlow
 {
     /// <summary>A render (output / playback) endpoint.</summary>
-    eRender = 0,
+    Render = 0,
 
     /// <summary>A capture (input / recording) endpoint.</summary>
-    eCapture = 1,
+    Capture = 1,
 
     /// <summary>Either direction; used when enumerating all endpoints.</summary>
-    eAll = 2,
-
-    /// <summary>The number of defined data-flow values (not a real direction).</summary>
-    EDataFlow_enum_count = 3
+    All = 2
 }

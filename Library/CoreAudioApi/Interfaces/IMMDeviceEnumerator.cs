@@ -30,17 +30,17 @@ namespace AudioDeviceLib.CoreAudioApi.Interfaces;
 internal interface IMMDeviceEnumerator
 {
     [PreserveSig]
-    int EnumAudioEndpoints(EDataFlow dataFlow, EDeviceState StateMask, out IMMDeviceCollection device);
+    int EnumAudioEndpoints(DataFlow dataFlow, DeviceState StateMask, out IMMDeviceCollection device);
 
     [PreserveSig]
-    int GetDefaultAudioEndpoint(EDataFlow dataFlow, ERole role, out IMMDevice ppEndpoint);
+    int GetDefaultAudioEndpoint(DataFlow dataFlow, Role role, out IMMDevice ppEndpoint);
 
     [PreserveSig]
     int GetDevice(string pwstrId, out IMMDevice ppDevice);
 
     [PreserveSig]
-    int RegisterEndpointNotificationCallback(IntPtr pClient);
+    int RegisterEndpointNotificationCallback(IMMNotificationClient pClient);
 
     [PreserveSig]
-    int UnregisterEndpointNotificationCallback(IntPtr pClient);
+    int UnregisterEndpointNotificationCallback(IMMNotificationClient pClient);
 }

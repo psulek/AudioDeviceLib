@@ -20,20 +20,11 @@
   3. This notice may not be removed or altered from any source distribution.
 */
 
-using System;
+namespace AudioDeviceLib.CoreAudioApi.Interfaces;
 
-namespace AudioDeviceLib.CoreAudioApi;
-
-/// <summary>Bit flags describing which functions an endpoint supports in hardware, matching the native <c>ENDPOINT_HARDWARE_SUPPORT_*</c> constants.</summary>
-[Flags]
-public enum EEndpointHardwareSupport
+internal enum StgmAccess
 {
-    /// <summary>The endpoint supports a hardware volume control.</summary>
-    Volume = 0x00000001,
-
-    /// <summary>The endpoint supports a hardware mute control.</summary>
-    Mute = 0x00000002,
-
-    /// <summary>The endpoint supports a hardware peak meter.</summary>
-    Meter = 0x00000004
+    Read = 0x00000000,
+    Write = 0x00000001,
+    ReadWrite = 0x00000002
 }
