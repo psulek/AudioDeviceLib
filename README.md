@@ -28,6 +28,19 @@ uses the same, well-established techniques as `AudioDeviceCmdlets`:
 
 See `THIRD-PARTY-NOTICES.md` for the full required notices.
 
+## Install
+
+```
+dotnet add package AudioDeviceLib --prerelease
+```
+
+The current release is `1.0.0-rc.1`, a release candidate. NuGet does not resolve prereleases by
+default, so the `--prerelease` flag is required — or pin it explicitly:
+
+```xml
+<PackageReference Include="AudioDeviceLib" Version="1.0.0-rc.1" />
+```
+
 ## Usage
 
 There are two ways in: **static one-liners** for the common cases, and the **instance API**

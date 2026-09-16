@@ -1,3 +1,12 @@
+/*
+  Copyright (c) 2026 Peter Šulek
+  MIT License
+
+  AudioDeviceInfo.cs
+  Immutable snapshot of an audio endpoint's identifying information, detached from the
+  live Core Audio COM object.
+*/
+
 using AudioDeviceLib.CoreAudioApi;
 
 namespace AudioDeviceLib.Lib;
