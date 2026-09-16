@@ -2,9 +2,7 @@ name: CI
 
 on:
   push:
-    # `gh` is temporary: it exists so workflow changes can be exercised before they reach main.
-    # Drop it from this list once that is done.
-    branches: [ main, gh ]
+    branches: [ main ]
   pull_request:
     branches: [ main ]
   workflow_dispatch:
