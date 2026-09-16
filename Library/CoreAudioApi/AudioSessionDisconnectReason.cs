@@ -33,6 +33,10 @@
     directives removed.
   - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
     documentation comments.
+  - Members de-prefixed from `DisconnectReason*` to `DeviceRemoval`/`ServerShutdown`/
+    `FormatChanged`/`SessionLogoff`/`SessionDisconnected`/`ExclusiveModeOverride`, matching the
+    naming convention applied to the other enums in this project. The `previous + 1` value chain
+    is kept, so the underlying values are unchanged.
 */
 
 namespace AudioDeviceLib.CoreAudioApi;
@@ -41,20 +45,20 @@ namespace AudioDeviceLib.CoreAudioApi;
 public enum AudioSessionDisconnectReason
 {
     /// <summary>The audio endpoint device was removed.</summary>
-    DisconnectReasonDeviceRemoval = 0,
+    DeviceRemoval = 0,
 
     /// <summary>The Windows audio service was shut down.</summary>
-    DisconnectReasonServerShutdown = (DisconnectReasonDeviceRemoval + 1),
+    ServerShutdown = (DeviceRemoval + 1),
 
     /// <summary>The stream format changed for the device the session is connected to.</summary>
-    DisconnectReasonFormatChanged = (DisconnectReasonServerShutdown + 1),
+    FormatChanged = (ServerShutdown + 1),
 
     /// <summary>The user logged off the Windows session the audio session was running under.</summary>
-    DisconnectReasonSessionLogoff = (DisconnectReasonFormatChanged + 1),
+    SessionLogoff = (FormatChanged + 1),
 
     /// <summary>The Windows session was disconnected.</summary>
-    DisconnectReasonSessionDisconnected = (DisconnectReasonSessionLogoff + 1),
+    SessionDisconnected = (SessionLogoff + 1),
 
     /// <summary>The (shared-mode) session was pre-empted by an exclusive-mode connection.</summary>
-    DisconnectReasonExclusiveModeOverride = (DisconnectReasonSessionDisconnected + 1)
+    ExclusiveModeOverride = (SessionDisconnected + 1)
 }

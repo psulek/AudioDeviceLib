@@ -33,6 +33,9 @@
     directives removed.
   - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
     documentation comments.
+  - Members de-prefixed from `AudioSessionStateInactive`/`AudioSessionStateActive`/
+    `AudioSessionStateExpired` to `Inactive`/`Active`/`Expired`, matching the naming convention
+    applied to the other enums in this project. The underlying values are unchanged.
 */
 
 namespace AudioDeviceLib.CoreAudioApi;
@@ -41,11 +44,11 @@ namespace AudioDeviceLib.CoreAudioApi;
 public enum AudioSessionState
 {
     /// <summary>The session is inactive (has no active audio streams).</summary>
-    AudioSessionStateInactive = 0,
+    Inactive = 0,
 
     /// <summary>The session is active (has one or more active audio streams).</summary>
-    AudioSessionStateActive = 1,
+    Active = 1,
 
     /// <summary>The session has expired (all associated streams have been released).</summary>
-    AudioSessionStateExpired = 2
+    Expired = 2
 }

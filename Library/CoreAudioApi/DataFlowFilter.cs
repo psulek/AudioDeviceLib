@@ -34,25 +34,28 @@
     directives removed.
   - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
     documentation comments.
-  - Enum renamed from `EDataFlow` to `DataFlow`; members `eRender`/`eCapture`/`eAll` renamed to
-    `Render`/`Capture`/`All`; the `EDataFlow_enum_count` sentinel was dropped.
-  - Split into a query-side and a state-side type. This file is now the state-side half and no
-    longer carries `All`, because `IMMEndpoint::GetDataFlow` can never return `eAll` and
-    `GetDefaultAudioEndpoint` rejects it. The query-side half, which keeps `All`, is the new
-    `DataFlowFilter`.
+  - Split out of the original `EDataFlow`: this is the query-side half, used only to select which
+    endpoints an enumeration returns. It keeps the `eAll` sentinel (renamed `All`); the state-side
+    half is `DataFlow`, which drops it because `IMMEndpoint::GetDataFlow` can never return `eAll`.
+  - Members `eRender`/`eCapture`/`eAll` renamed to `Render`/`Capture`/`All`; the
+    `EDataFlow_enum_count` sentinel was dropped.
 */
 
 namespace AudioDeviceLib.CoreAudioApi;
 
 /// <summary>
-/// The data-flow direction of a single audio endpoint, matching the native <c>EDataFlow</c>.
-/// To select endpoints when enumerating, use <see cref="DataFlowFilter"/>.
+/// Selects which endpoint directions an enumeration returns, matching the native <c>EDataFlow</c>.
+/// The direction of a single endpoint is <see cref="DataFlow"/>.
 /// </summary>
-public enum DataFlow
+/// <remarks>This is not a bit field; the members are discrete values and cannot be combined.</remarks>
+public enum DataFlowFilter
 {
-    /// <summary>A render (output / playback) endpoint.</summary>
+    /// <summary>Render (output / playback) endpoints only.</summary>
     Render = 0,
 
-    /// <summary>A capture (input / recording) endpoint.</summary>
-    Capture = 1
+    /// <summary>Capture (input / recording) endpoints only.</summary>
+    Capture = 1,
+
+    /// <summary>Endpoints in either direction.</summary>
+    All = 2
 }

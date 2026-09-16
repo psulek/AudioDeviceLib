@@ -39,6 +39,9 @@
   - Added `RegisterEndpointNotificationCallback` / `UnregisterEndpointNotificationCallback`,
     forwarding a typed `IMMNotificationClient` to the underlying enumerator.
   - `EDataFlow`/`EDeviceState`/`ERole` renamed to `DataFlow`/`DeviceState`/`Role`.
+  - `EnumerateAudioEndPoints` now takes the query-side `DataFlowFilter` / `DeviceStateFilter`, while
+    `GetDefaultAudioEndpoint` and `GetDefaultAudioEndpointDeviceId` keep the state-side `DataFlow`,
+    which has no `All` member — the native calls require a concrete direction.
 */
 
 using System;
@@ -63,11 +66,11 @@ internal class MMDeviceEnumerator
     private IMMDeviceEnumerator _realEnumerator = new _MMDeviceEnumerator() as IMMDeviceEnumerator;
 
     /// <summary>Enumerates the audio endpoints that match the given data flow and state mask.</summary>
-    /// <param name="dataFlow">The data-flow direction to enumerate (render, capture or all).</param>
-    /// <param name="dwStateMask">A bit mask of device states to include (e.g. active, disabled, unplugged).</param>
+    /// <param name="dataFlow">The data-flow direction to enumerate: <see cref="DataFlowFilter.Render"/>, <see cref="DataFlowFilter.Capture"/> or <see cref="DataFlowFilter.All"/>.</param>
+    /// <param name="dwStateMask">A bit mask of device states to include; combine flags or pass <see cref="DeviceStateFilter.All"/>.</param>
     /// <returns>An <see cref="MMDeviceCollection"/> of the matching endpoints.</returns>
     /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
-    internal MMDeviceCollection EnumerateAudioEndPoints(DataFlow dataFlow, DeviceState dwStateMask)
+    internal MMDeviceCollection EnumerateAudioEndPoints(DataFlowFilter dataFlow, DeviceStateFilter dwStateMask)
     {
         Marshal.ThrowExceptionForHR(
             _realEnumerator.EnumAudioEndpoints(dataFlow, dwStateMask, out var result));

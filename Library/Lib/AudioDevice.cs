@@ -11,6 +11,7 @@
 
 using System;
 using AudioDeviceLib.CoreAudioApi;
+using JetBrains.Annotations;
 
 namespace AudioDeviceLib.Lib;
 
@@ -23,6 +24,7 @@ namespace AudioDeviceLib.Lib;
 /// or accessed <see cref="Device"/> for sessions/endpoint volume; that deterministically tears
 /// down any registered Core Audio callbacks. Enumeration-only instances hold nothing registered.
 /// </remarks>
+[PublicAPI]
 public sealed class AudioDevice : IDisposable
 {
     /// <summary>True if this endpoint is the current default device for its kind (multimedia role).</summary>
@@ -60,10 +62,9 @@ public sealed class AudioDevice : IDisposable
     
     /// <summary>Creates an immutable <see cref="AudioDeviceInfo"/> snapshot of this device's identifying data.</summary>
     /// <returns>
-    /// A snapshot carrying this device's <see cref="Index"/>, default flags, <see cref="Kind"/>,
-    /// <see cref="Name"/> and <see cref="Id"/>, safe to keep after this <see cref="AudioDevice"/> is disposed.
+    /// A snapshot carrying this device's information, safe to keep after this <see cref="AudioDevice"/> is disposed of.
     /// </returns>
-    // public AudioDeviceInfo ToDeviceInfo() => new AudioDeviceInfo(Index, IsDefault, IsDefaultCommunication, Kind, Name, Id);
+    public AudioDeviceInfo ToDeviceInfo() => new AudioDeviceInfo(Id, Name, Kind, State, IsDefault, IsDefaultCommunication);
 
     /// <summary>Master volume as a percentage in the range 0..100.</summary>
     /// <returns>The current master volume scalar expressed as a percentage between 0 and 100.</returns>
@@ -103,6 +104,9 @@ public sealed class AudioDevice : IDisposable
     /// Gets the current state of the endpoint.
     /// </summary>
     public DeviceState State => Device.State;
+    
+    /// <summary>Gets whether the endpoint is active and available for use.</summary>
+    public bool IsActive => State == DeviceState.Active;
 
     /// <summary>Inverts the current mute state.</summary>
     public void ToggleMute()

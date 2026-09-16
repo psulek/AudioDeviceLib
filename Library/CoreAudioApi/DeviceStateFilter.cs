@@ -27,32 +27,47 @@
   misrepresented as being the original source code. Altered by Peter Šulek for AudioDeviceLib
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
-  Derived from `SOURCE/EDataFlow.cs` upstream.
+  Derived from `SOURCE/EDeviceState.cs` upstream.
 
   Changes from the original:
   - Namespace changed to `AudioDeviceLib.CoreAudioApi` (file-scoped); unused `using`
     directives removed.
   - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
     documentation comments.
-  - Enum renamed from `EDataFlow` to `DataFlow`; members `eRender`/`eCapture`/`eAll` renamed to
-    `Render`/`Capture`/`All`; the `EDataFlow_enum_count` sentinel was dropped.
-  - Split into a query-side and a state-side type. This file is now the state-side half and no
-    longer carries `All`, because `IMMEndpoint::GetDataFlow` can never return `eAll` and
-    `GetDefaultAudioEndpoint` rejects it. The query-side half, which keeps `All`, is the new
-    `DataFlowFilter`.
+  - Split out of the original `EDeviceState`: this is the query-side half, used only as the
+    `StateMask` that selects which endpoints an enumeration returns, where combining bits is
+    correct. The state-side half is `DeviceState`, which is not `[Flags]` and drops `All`, because
+    `IMMDevice::GetState` always reports exactly one state.
+  - Members renamed from `DEVICE_STATE_*` / `DEVICE_STATEMASK_ALL` to `Active`/`Disabled`/
+    `NotPresent`/`Unplugged`/`All`.
+  - Values corrected against the Windows SDK (`mmdeviceapi.h`): `Unplugged` is `0x8` (was `0x2`),
+    the missing `Disabled` (`0x2`) was added, and `All` is `0xF` (was `0x7`).
 */
+
+using System;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
 /// <summary>
-/// The data-flow direction of a single audio endpoint, matching the native <c>EDataFlow</c>.
-/// To select endpoints when enumerating, use <see cref="DataFlowFilter"/>.
+/// A bit mask of endpoint states selecting which endpoints an enumeration returns, matching the
+/// native <c>DEVICE_STATE_*</c> constants. The state of a single endpoint is
+/// <see cref="DeviceState"/>.
 /// </summary>
-public enum DataFlow
+[Flags]
+public enum DeviceStateFilter : uint
 {
-    /// <summary>A render (output / playback) endpoint.</summary>
-    Render = 0,
+    /// <summary>Match endpoints that are active and available for use.</summary>
+    Active = 0x00000001,
 
-    /// <summary>A capture (input / recording) endpoint.</summary>
-    Capture = 1
+    /// <summary>Match endpoints that are disabled (turned off in the Windows sound control panel).</summary>
+    Disabled = 0x00000002,
+
+    /// <summary>Match endpoints that are not present (e.g. removed).</summary>
+    NotPresent = 0x00000004,
+
+    /// <summary>Match endpoints that are present but whose audio jack is unplugged.</summary>
+    Unplugged = 0x00000008,
+
+    /// <summary>Match endpoints in any state.</summary>
+    All = Active | Disabled | NotPresent | Unplugged
 }

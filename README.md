@@ -30,8 +30,53 @@ See `THIRD-PARTY-NOTICES.md` for the full required notices.
 
 ## Usage
 
+There are two ways in: **static one-liners** for the common cases, and the **instance API**
+when you need live objects or repeated operations.
+
+### One-liners
+
+Each static call creates and disposes its own `AudioController` and device, so you own
+nothing and there is nothing to dispose. They hand back `AudioDeviceInfo`, an immutable
+snapshot, rather than a live `AudioDevice`.
+
 ```csharp
-using AudioDeviceLib;
+using AudioDeviceLib.Lib;
+
+// Defaults
+AudioDeviceInfo playback = AudioController.GetDefaultPlayback();
+AudioDeviceInfo recording = AudioController.GetDefaultRecording();
+Console.WriteLine(playback.Name);
+
+// Volume (0..100) and mute on the default playback device
+float volume = AudioController.GetVolume();
+AudioController.SetVolume(50f);
+bool muted = AudioController.IsMuted();
+AudioController.SetMute(false);
+bool nowMuted = AudioController.ToggleMute();
+
+// ...or on a specific endpoint
+AudioController.SetVolume(playback.Id, 25f);
+
+// Active endpoints, as snapshots
+IReadOnlyList<AudioDeviceInfo> all = AudioController.ListDevices();
+IReadOnlyList<AudioDeviceInfo> outputs = AudioController.ListDevices(AudioDeviceKind.Playback);
+
+// Make the first device whose name contains "Speakers" the default.
+// Returns null if nothing matches, so you can fall back or report clearly.
+AudioDeviceInfo set = AudioController.SetDefaultPlaybackByName("Speakers");
+if (set == null)
+{
+    Console.Error.WriteLine("No matching playback device found.");
+}
+```
+
+These create a controller per call. For repeated work — polling, or several operations on
+the same device — use the instance API below.
+
+### Instance API
+
+```csharp
+using AudioDeviceLib.Lib;
 
 // AudioController is IDisposable — wrap it in a using so it is torn down deterministically.
 using var audio = new AudioController();
@@ -40,7 +85,7 @@ using var audio = new AudioController();
 // These enumeration-only devices hold no COM callbacks, so they are safe to leave to GC.
 foreach (var d in audio.GetPlaybackDevices())
 {
-    Console.WriteLine(d); // "[1] Speakers (Realtek...) (Playback) [Default]"
+    Console.WriteLine(d); // "Speakers (Realtek...) (Playback) [Default]"
 }
 
 // Current default output. AudioDevice is IDisposable — once you touch its volume/mute
@@ -59,19 +104,16 @@ using (AudioDevice current = audio.GetDefaultPlaybackDevice())
         // Or pick exactly which Windows roles to assign (flags can be combined)
         audio.SetDefaultDevice(current, DefaultRole.Console | DefaultRole.Multimedia);
         audio.SetDefaultDevice(current, DefaultRole.All);
-    }
-}
 
-// Set the default output to the first device whose name contains "Speakers".
-// Returns null if nothing matches, so you can fall back or report clearly.
-using (AudioDevice set = audio.SetDefaultPlaybackByName("Speakers"))
-{
-    if (set == null)
-    {
-        Console.Error.WriteLine("No matching playback device found.");
+        // Detach an immutable snapshot you can keep after the device is disposed
+        AudioDeviceInfo snapshot = current.ToDeviceInfo();
     }
 }
 ```
+
+`GetDevices` on the instance API also takes `DataFlowFilter` and `DeviceStateFilter`
+(in `AudioDeviceLib.CoreAudioApi`) if you need endpoints that are disabled, not present
+or unplugged — the static `ListDevices` returns active endpoints only.
 
 ## Disposal
 
@@ -84,6 +126,9 @@ they own with `using`:
   devices you only printed hold nothing registered and can be left to GC.
 - Session notifications — `RegisterAudioSessionNotification` returns an `IDisposable`
   token; dispose it (or the owning device) to unregister the sink.
+- The **static** methods own and dispose everything they create, and return
+  `AudioDeviceInfo` snapshots rather than live devices — there is nothing for you to
+  dispose.
 
 By convention the code in this repo also always uses **full braces** for `if`, `foreach`
 and other control-flow blocks — even single-statement bodies — for clarity and to avoid
@@ -98,7 +143,7 @@ so the callback is unregistered deterministically when you are done listening.
 > and may arrive concurrently. Keep each handler fast and thread-safe.
 
 ```csharp
-using AudioDeviceLib;
+using AudioDeviceLib.Lib;
 using AudioDeviceLib.CoreAudioApi;
 
 // Implement the attribute-free contract for the events you care about. Every callback receives an
@@ -181,7 +226,7 @@ consumer on the controller. Like session notifications, registration returns an 
 token; disposing it (or the controller) unregisters.
 
 ```csharp
-using AudioDeviceLib;
+using AudioDeviceLib.Lib;
 using AudioDeviceLib.CoreAudioApi;
 
 sealed class DeviceLogger : IAudioDeviceEvents

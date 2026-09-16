@@ -44,6 +44,7 @@ internal static class Program
                 case "volume":  return CmdVolume(audio, opts);
                 case "mute":    return CmdMute(audio, opts);
                 case "watch":   return CmdWatch(audio, opts);
+                case "quick":   return CmdQuick();
                 default:
                     Console.Error.WriteLine("Unknown command: " + command);
                     Console.Error.WriteLine("Run '" + Exe + " --help' for usage.");
@@ -390,6 +391,89 @@ internal static class Program
         return true;
     }
 
+    // Exercises the static convenience API end to end. Read-only apart from volume/mute, which are
+    // restored to their original values before returning.
+    private static int CmdQuick()
+    {
+        Console.WriteLine("-- ListDevices --");
+        IReadOnlyList<AudioDeviceInfo> all = AudioController.ListDevices();
+        IReadOnlyList<AudioDeviceInfo> playback = AudioController.ListDevices(AudioDeviceKind.Playback);
+        IReadOnlyList<AudioDeviceInfo> recording = AudioController.ListDevices(AudioDeviceKind.Recording);
+        Console.WriteLine($"  all={all.Count}  playback={playback.Count}  recording={recording.Count}");
+
+        if (playback.Count + recording.Count != all.Count)
+        {
+            Console.Error.WriteLine("  MISMATCH: playback + recording != all");
+            return 1;
+        }
+
+        if (recording.Any(d => d.Kind != AudioDeviceKind.Recording))
+        {
+            Console.Error.WriteLine("  MISMATCH: ListDevices(Recording) returned a non-recording endpoint");
+            return 1;
+        }
+
+        Console.WriteLine("-- Defaults --");
+        AudioDeviceInfo defPlayback = AudioController.GetDefaultPlayback();
+        AudioDeviceInfo defRecording = AudioController.GetDefaultRecording();
+        Console.WriteLine($"  playback : {defPlayback.Name}");
+        Console.WriteLine($"             {defPlayback.Id}");
+        Console.WriteLine($"  recording: {defRecording.Name}");
+        Console.WriteLine($"             {defRecording.Id}");
+
+        Console.WriteLine("-- Volume (default playback) --");
+        float volume = AudioController.GetVolume();
+        Console.WriteLine($"  read {volume:0}%");
+        AudioController.SetVolume(volume);
+        Console.WriteLine($"  re-read after writing the same value: {AudioController.GetVolume():0}%");
+
+        Console.WriteLine("-- Mute (default playback) --");
+        bool muted = AudioController.IsMuted();
+        Console.WriteLine($"  read muted={muted}");
+        Console.WriteLine($"  toggle -> {AudioController.ToggleMute()}");
+        Console.WriteLine($"  toggle -> {AudioController.ToggleMute()}");
+
+        if (AudioController.IsMuted() != muted)
+        {
+            Console.Error.WriteLine("  MISMATCH: mute did not return to its original state");
+            return 1;
+        }
+
+        Console.WriteLine("-- By-ID overloads --");
+        string id = defPlayback.Id;
+        Console.WriteLine($"  GetVolume(id) = {AudioController.GetVolume(id):0}%");
+        Console.WriteLine($"  IsMuted(id)   = {AudioController.IsMuted(id)}");
+        AudioController.SetMute(id, muted);
+        AudioController.SetVolume(id, volume);
+        Console.WriteLine($"  restored volume={AudioController.GetVolume(id):0}%  muted={AudioController.IsMuted(id)}");
+
+        Console.WriteLine("-- Error paths --");
+        Console.WriteLine($"  GetVolume(null)  -> {Expect<ArgumentNullException>(() => AudioController.GetVolume(null))}");
+        Console.WriteLine($"  GetVolume(\"nope\") -> {Expect<Exception>(() => AudioController.GetVolume("nope"))}");
+        Console.WriteLine($"  SetDefaultPlaybackByName(\"zzzz\") -> {Describe(AudioController.SetDefaultPlaybackByName("zzzz"))}");
+
+        Console.WriteLine("All static-API checks passed.");
+        return 0;
+    }
+
+    private static string Expect<T>(Action action) where T : Exception
+    {
+        try
+        {
+            action();
+            return "NO THROW (unexpected)";
+        }
+        catch (T ex)
+        {
+            return ex.GetType().Name;
+        }
+    }
+
+    private static string Describe(AudioDeviceInfo info)
+    {
+        return info == null ? "null (no match)" : info.Name;
+    }
+
     private static void PrintDevice(AudioDevice d)
     {
         Console.WriteLine($"  Name  : {d.Name}");
@@ -500,6 +584,7 @@ COMMANDS:
   volume     Get or set a device's volume
   mute       Get, set or toggle a device's mute state
   watch      Log session, endpoint-volume and device (default-change) events for a device
+  quick      Exercise the static convenience API (AudioController.GetVolume, IsMuted, ...)
   help       Show this help
 
 SELECTORS (for set / volume / mute - pick exactly one):
@@ -521,6 +606,7 @@ OPTIONS:
   volume    <selector> [--set <0..100>]       (omit --set to just read)
   mute      <selector> [--set <on|off|toggle>] (omit --set to just read)
   watch     [<selector>]                       (default: default playback device)
+  quick                                        (no options; restores volume/mute it changes)
 
 EXAMPLES:
   " + Exe + @" list

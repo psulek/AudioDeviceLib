@@ -38,14 +38,19 @@
     `DEVICE_STATEMASK_ALL` to `Active`/`NotPresent`/`Unplugged`/`All`.
   - Values corrected against the Windows SDK (`mmdeviceapi.h`): `Unplugged` is `0x8` (was `0x2`),
     the missing `Disabled` (`0x2`) was added, and `All` is `0xF` (was `0x7`).
+  - Split into a query-side and a state-side type. This file is now the state-side half: `[Flags]`
+    and `All` were dropped, because `IMMDevice::GetState` always reports exactly one state and
+    `All` is not a state a device can be in. The `uint` underlying type and the `0x1`/`0x2`/`0x4`/
+    `0x8` values are kept, since they are the COM out-param contract. The query-side half, which
+    stays `[Flags]` and keeps `All`, is the new `DeviceStateFilter`.
 */
-
-using System;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
-/// <summary>Bit flags describing the state of an audio endpoint, matching the native <c>DEVICE_STATE_*</c> constants.</summary>
-[Flags]
+/// <summary>
+/// The current state of a single audio endpoint, matching the native <c>DEVICE_STATE_*</c>
+/// constants. To select endpoints by state when enumerating, use <see cref="DeviceStateFilter"/>.
+/// </summary>
 public enum DeviceState : uint
 {
     /// <summary>The endpoint is active and available for use.</summary>
@@ -58,8 +63,5 @@ public enum DeviceState : uint
     NotPresent = 0x00000004,
 
     /// <summary>The endpoint is present but its audio jack is unplugged.</summary>
-    Unplugged = 0x00000008,
-
-    /// <summary>Mask matching endpoints in any state.</summary>
-    All = Active | Disabled | NotPresent | Unplugged
+    Unplugged = 0x00000008
 }

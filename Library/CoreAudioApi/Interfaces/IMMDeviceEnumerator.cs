@@ -35,6 +35,10 @@
   - `RegisterEndpointNotificationCallback` / `UnregisterEndpointNotificationCallback` now take a
     typed `IMMNotificationClient` instead of `IntPtr`.
   - `EDataFlow`/`EDeviceState`/`ERole` renamed to `DataFlow`/`DeviceState`/`Role`.
+  - `EnumAudioEndpoints` now takes the query-side `DataFlowFilter` / `DeviceStateFilter` rather than
+    the state-side `DataFlow` / `DeviceState`, so that `All` can only be passed where it is legal.
+    `GetDefaultAudioEndpoint` keeps the state-side `DataFlow`, which has no `All` member: the native
+    call requires a concrete direction, and this now fails to compile instead of at runtime.
 */
 
 using System;
@@ -47,7 +51,7 @@ namespace AudioDeviceLib.CoreAudioApi.Interfaces;
 internal interface IMMDeviceEnumerator
 {
     [PreserveSig]
-    int EnumAudioEndpoints(DataFlow dataFlow, DeviceState StateMask, out IMMDeviceCollection device);
+    int EnumAudioEndpoints(DataFlowFilter dataFlow, DeviceStateFilter StateMask, out IMMDeviceCollection device);
 
     [PreserveSig]
     int GetDefaultAudioEndpoint(DataFlow dataFlow, Role role, out IMMDevice ppEndpoint);
