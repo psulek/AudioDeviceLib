@@ -49,8 +49,10 @@ SOFTWARE.
 - Copyright (c) 2007-2010 Ray Molenkamp
 - License: zlib/libpng-style permissive license.
 
-All files under `CoreAudioApi/` and `CoreAudioApi/Interfaces/` that originate from this
-work carry the notice below.
+All files that originate from this work carry the notice below. Most live under
+`CoreAudioApi/` and `CoreAudioApi/Interfaces/`; two are in `Lib/`, because the original
+`MMDevice` was merged into `Lib/AudioDevice.cs` and the original `MMDeviceEnumerator` into
+`Lib/AudioController.cs`.
 
 Per condition 2 of that license: **every one of these files has been altered** and none is
 an unmodified copy. Each altered file carries a `MODIFICATIONS` block directly beneath the

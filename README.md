@@ -94,15 +94,14 @@ using AudioDeviceLib.Lib;
 // AudioController is IDisposable — wrap it in a using so it is torn down deterministically.
 using var audio = new AudioController();
 
-// List active playback devices.
-// These enumeration-only devices hold no COM callbacks, so they are safe to leave to GC.
+// List active playback devices. AudioDevice is IDisposable; dispose what you enumerate.
 foreach (var d in audio.GetPlaybackDevices())
 {
     Console.WriteLine(d); // "Speakers (Realtek...) (Playback) [Default]"
+    d.Dispose();
 }
 
-// Current default output. AudioDevice is IDisposable — once you touch its volume/mute
-// (or its sessions) it registers Core Audio callbacks, so dispose it with a using.
+// Current default output.
 using (AudioDevice current = audio.GetDefaultPlaybackDevice())
 {
     if (current != null)
@@ -120,9 +119,20 @@ using (AudioDevice current = audio.GetDefaultPlaybackDevice())
 
         // Detach an immutable snapshot you can keep after the device is disposed
         AudioDeviceInfo snapshot = current.ToDeviceInfo();
+
+        // Volume, sessions, metering and the raw property store hang off the device
+        current.Volume.VolumeStepUp();
+        var sessions = current.SessionManager.Sessions;
+        float peak = current.GetPeakValue();
     }
 }
 ```
+
+`Id`, `Name`, `Kind` and `State` are captured when the device is created, so reading them
+costs nothing and still works after the device is disposed. Call `Refresh()` to re-read
+`Name`/`State`, or register for device notifications (below) to be told when they change.
+Devices compare by endpoint ID, so `a.Equals(b)` is `true` for two handles on the same
+endpoint — reference equality never is.
 
 `GetDevices` on the instance API also takes `DataFlowFilter` and `DeviceStateFilter`
 (in `AudioDeviceLib.CoreAudioApi`) if you need endpoints that are disabled, not present
@@ -133,10 +143,15 @@ or unplugged — the static `ListDevices` returns active endpoints only.
 Much of the object graph implements `IDisposable`, so callers should dispose what
 they own with `using`:
 
-- `AudioController` — dispose the controller itself (shown above).
-- `AudioDevice` — dispose any device you read volume/mute from or used for sessions;
-  it deterministically tears down the registered Core Audio callbacks. Enumeration-only
-  devices you only printed hold nothing registered and can be left to GC.
+- `AudioController` — dispose the controller itself (shown above). That unregisters any
+  device-notification sinks still attached; it does **not** dispose devices it handed you.
+- `AudioDevice` — dispose every device you obtain. Disposal tears down the Core Audio
+  callbacks and activations that device made, and afterwards every member that talks to
+  Core Audio (`Volume`, `SessionManager`, `Meter`, `Properties`, `Refresh`, the volume and
+  mute helpers) throws `ObjectDisposedException`. The identity snapshot (`Id`, `Name`,
+  `Kind`, `State`, `ToDeviceInfo()`, `ToString()`, `Equals()`) stays readable. Disposing
+  twice is a no-op, and disposing one device never affects another — each one wraps its
+  own Core Audio endpoint object.
 - Session notifications — `RegisterAudioSessionNotification` returns an `IDisposable`
   token; dispose it (or the owning device) to unregister the sink.
 - The **static** methods own and dispose everything they create, and return
@@ -192,7 +207,7 @@ using (AudioDevice device = audio.GetDefaultPlaybackDevice())
 {
     if (device != null)
     {
-        SessionCollection sessions = device.Device.AudioSessionManager.Sessions;
+        SessionCollection sessions = device.SessionManager.Sessions;
 
         // Register on every current session; keep the tokens so they can be disposed.
         var tokens = new List<IDisposable>();
@@ -303,3 +318,19 @@ Console role, pass `DefaultRole.All` or include `DefaultRole.Console` in the com
 ```
 dotnet build
 ```
+
+## Tests
+
+```
+dotnet test Library.UnitTests/Library.UnitTests.csproj -c Release
+```
+
+The suite runs three times, once per shipped asset: `net48`, `net7.0-windows` (which is how the
+`netstandard2.0` build gets executed — netstandard cannot be targeted directly) and
+`net8.0-windows`. One test asserts which asset each leg actually loaded, so a silent collapse onto a
+single build would fail rather than pass quietly.
+
+Tests are read-only: nothing changes volume, mute or the default device. Tests that need a real
+endpoint skip themselves on a machine with no audio hardware, so the suite is still meaningful on a
+headless CI runner — what it covers there is COM activation, enumeration and the deterministic
+`Marshal.ReleaseComObject` paths.

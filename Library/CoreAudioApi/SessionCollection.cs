@@ -74,10 +74,7 @@ public class SessionCollection : IDisposable
         {
             lock (_lock)
             {
-                if (_disposed)
-                {
-                    throw new ObjectDisposedException(nameof(SessionCollection));
-                }
+                ThrowIfDisposed();
 
                 _cache ??= new AudioSessionControl[CountCore()];
 
@@ -105,10 +102,7 @@ public class SessionCollection : IDisposable
         {
             lock (_lock)
             {
-                if (_disposed)
-                {
-                    throw new ObjectDisposedException(nameof(SessionCollection));
-                }
+                ThrowIfDisposed();
 
                 return _cache?.Length ?? CountCore();
             }
@@ -143,6 +137,15 @@ public class SessionCollection : IDisposable
             {
                 session?.Dispose();
             }
+        }
+    }
+
+    // Callers hold _lock; the flag is only ever written under it.
+    private void ThrowIfDisposed()
+    {
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(nameof(SessionCollection));
         }
     }
 }

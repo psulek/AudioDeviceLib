@@ -189,10 +189,7 @@ public class AudioSessionControl : IDisposable
         SessionEventsRegistration token;
         lock (_registrationsLock)
         {
-            if (_disposed)
-            {
-                throw new ObjectDisposedException(nameof(AudioSessionControl));
-            }
+            ThrowIfDisposed();
 
             if (_registrations.TryGetValue(eventConsumer, out var existing))
             {
@@ -332,4 +329,13 @@ public class AudioSessionControl : IDisposable
 
     /// <summary>Gets a value indicating whether this session is the reserved system-sounds session.</summary>
     public bool IsSystemIsSystemSoundsSession => (_AudioSessionControl.IsSystemSoundsSession() == 0); //S_OK
+
+    // Callers hold _registrationsLock; the flag is only ever written under it.
+    private void ThrowIfDisposed()
+    {
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(nameof(AudioSessionControl));
+        }
+    }
 }

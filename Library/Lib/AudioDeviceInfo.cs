@@ -7,6 +7,7 @@
   live Core Audio COM object.
 */
 
+using System;
 using AudioDeviceLib.CoreAudioApi;
 
 namespace AudioDeviceLib.Lib;
@@ -48,5 +49,28 @@ public sealed class AudioDeviceInfo
         State = state;
         IsDefault = isDefault;
         IsDefaultCommunication = isDefaultCommunication;
+    }
+
+    /// <summary>Determines whether the given object describes the same endpoint, compared by <see cref="Id"/>.</summary>
+    /// <param name="obj">The object to compare with.</param>
+    /// <returns><c>true</c> if <paramref name="obj"/> is an <see cref="AudioDeviceInfo"/> with the same ID.</returns>
+    public override bool Equals(object obj)
+    {
+        return obj is AudioDeviceInfo other &&
+               string.Equals(Id, other.Id, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>Serves as the hash function, derived from <see cref="Id"/>.</summary>
+    /// <returns>A hash code for this endpoint snapshot.</returns>
+    public override int GetHashCode()
+    {
+        return Id == null ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(Id);
+    }
+
+    /// <summary>Returns a human-readable description of this endpoint.</summary>
+    /// <returns>A string in the form <c>Name (Kind)</c>, with default-role markers when applicable.</returns>
+    public override string ToString()
+    {
+        return $"{Name} ({Kind}){(IsDefault ? " [Default]" : string.Empty)}{(IsDefaultCommunication ? " [DefaultComm]" : string.Empty)}";
     }
 }

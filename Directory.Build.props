@@ -11,8 +11,5 @@
         <ImplicitUsings>disable</ImplicitUsings>
 
         <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
-
-        <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-        <AppendRuntimeIdentifierToOutputPath>false</AppendRuntimeIdentifierToOutputPath>
     </PropertyGroup>
 </Project>

@@ -58,8 +58,6 @@ internal static class Program
         }
     }
 
-    // ---- Commands -----------------------------------------------------------------
-
     private static int CmdList(AudioController audio, Options o)
     {
         IReadOnlyList<AudioDevice> devices;
@@ -243,7 +241,7 @@ internal static class Program
         Console.WriteLine($"Watching audio sessions on:  {device.Name}, ID={device.Id}");
 
         // 1) Per-session events (the app / "System sounds" sliders in the mixer).
-        SessionCollection sessions = device.Device.AudioSessionManager.Sessions;
+        SessionCollection sessions = device.SessionManager.Sessions;
         var registrations = new List<IDisposable>();
 
         for (int i = 0; i < sessions.Count; i++)
@@ -258,7 +256,7 @@ internal static class Program
 
         // 2) Endpoint (device master) volume events (the "System -> Volume" slider).
         //    This is a separate notification path (IAudioEndpointVolume), so subscribe to it too.
-        AudioEndpointVolume endpointVolume = device.Device.AudioEndpointVolume;
+        AudioEndpointVolume endpointVolume = device.Volume;
         AudioEndpointVolumeNotificationDelegate endpointHandler = data =>
             Console.WriteLine(
                 $"[endpoint: {device.Name}] master={data.MasterVolume:P0} muted={data.Muted} channels={data.Channels}");
@@ -285,8 +283,6 @@ internal static class Program
         Console.WriteLine("Unregistered. Done.");
         return 0;
     }
-
-    // ---- Selector / role helpers --------------------------------------------------
 
     // Resolves a device from --name / --id (+ --recording to scope --name).
     private static AudioDevice ResolveSelector(AudioController audio, Options o)
@@ -450,7 +446,7 @@ internal static class Program
         Console.WriteLine("-- Error paths --");
         Console.WriteLine($"  GetVolume(null)  -> {Expect<ArgumentNullException>(() => AudioController.GetVolume(null))}");
         Console.WriteLine($"  GetVolume(\"nope\") -> {Expect<Exception>(() => AudioController.GetVolume("nope"))}");
-        Console.WriteLine($"  SetDefaultPlaybackByName(\"zzzz\") -> {Describe(AudioController.SetDefaultPlaybackByName("zzzz"))}");
+        Console.WriteLine($"  SetDefaultPlaybackByName(\"zzzz\") -> result: {AudioController.SetDefaultPlaybackByName("zzzz")}");
 
         Console.WriteLine("All static-API checks passed.");
         return 0;
@@ -482,8 +478,6 @@ internal static class Program
         Console.WriteLine($"  Default: {d.IsDefault}   DefaultComm: {d.IsDefaultCommunication}");
         Console.WriteLine($"  Volume: {d.GetVolumePercent():0}%   Muted: {d.IsMuted}");
     }
-
-    // ---- Tiny option parser -------------------------------------------------------
 
     private static bool IsHelp(string a)
     {
@@ -565,8 +559,6 @@ internal static class Program
             return _map.TryGetValue(key, out var v) ? v : null;
         }
     }
-
-    // ---- Help ---------------------------------------------------------------------
 
     private static void PrintHelp()
     {

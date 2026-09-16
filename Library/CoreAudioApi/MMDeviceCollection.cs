@@ -33,43 +33,108 @@
     directives removed.
   - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
     documentation comments.
+  - The indexer now yields `AudioDeviceLib.Lib.AudioDevice`, the merged device type, instead of the
+    removed `MMDevice`.
+  - `Count` is read from COM once and cached; the underlying collection is a snapshot of a single
+    enumeration and cannot change.
+  - The indexer now checks the HRESULT from `IMMDeviceCollection::Item` instead of discarding it.
+  - Implements `IDisposable`, releasing the `IMMDeviceCollection` RCW.
 */
 
+using System;
 using System.Runtime.InteropServices;
 using AudioDeviceLib.CoreAudioApi.Interfaces;
+using AudioDeviceLib.Lib;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
 /// <summary>A read-only collection of <see cref="MMDevice"/> audio endpoints returned by an enumeration.</summary>
-public class MMDeviceCollection
+public class MMDeviceCollection : IDisposable
 {
     private IMMDeviceCollection _MMDeviceCollection;
+    private int _count = -1;
+    private bool _disposed;
 
     /// <summary>Gets the number of endpoints in the collection.</summary>
-    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed.</exception>
+    /// <exception cref="COMException">Thrown when the underlying Core Audio call fails.</exception>
     public int Count
     {
         get
         {
-            Marshal.ThrowExceptionForHR(_MMDeviceCollection.GetCount(out var result));
-            return (int)result;
+            ThrowIfDisposed();
+
+            // Cached: an IMMDeviceCollection is a snapshot of one enumeration, so the count is
+            // fixed for the lifetime of this object. Re-reading it made every `i < Count` loop
+            // condition a COM round trip.
+            if (_count < 0)
+            {
+                Marshal.ThrowExceptionForHR(_MMDeviceCollection.GetCount(out var result));
+                _count = (int)result;
+            }
+
+            return _count;
         }
     }
 
     /// <summary>Gets the endpoint at the specified zero-based position.</summary>
     /// <param name="index">The zero-based index of the endpoint to retrieve (0 to <see cref="Count"/> - 1).</param>
-    /// <returns>The <see cref="MMDevice"/> at the requested position.</returns>
-    public MMDevice this[int index]
+    /// <returns>A new <see cref="AudioDevice"/> for the endpoint at the requested position.</returns>
+    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed.</exception>
+    /// <exception cref="COMException">Thrown when the index is out of range or the call fails.</exception>
+    /// <remarks>
+    /// Each access returns a new instance wrapping its own COM endpoint object; the caller owns it
+    /// and is responsible for disposing it. The collection intentionally keeps no reference, so
+    /// disposing the collection never invalidates a device it handed out.
+    /// </remarks>
+    public AudioDevice this[int index]
     {
         get
         {
-            _MMDeviceCollection.Item((uint)index, out IMMDevice result);
-            return new MMDevice(result);
+            ThrowIfDisposed();
+            Marshal.ThrowExceptionForHR(_MMDeviceCollection.Item((uint)index, out IMMDevice result));
+            return new AudioDevice(result, false, false);
         }
     }
 
     internal MMDeviceCollection(IMMDeviceCollection parent)
     {
         _MMDeviceCollection = parent;
+    }
+
+    /// <summary>Releases the underlying Core Audio collection.</summary>
+    /// <remarks>Devices already obtained from the indexer are unaffected and remain usable.</remarks>
+    public void Dispose()
+    {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
+        // Safe to release deterministically: this RCW never leaves the library, so nothing else can
+        // be holding it.
+        try
+        {
+            if (_MMDeviceCollection != null && Marshal.IsComObject(_MMDeviceCollection))
+            {
+                Marshal.ReleaseComObject(_MMDeviceCollection);
+            }
+        }
+        catch
+        {
+            // best-effort cleanup
+        }
+
+        _MMDeviceCollection = null;
+    }
+
+    private void ThrowIfDisposed()
+    {
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(nameof(MMDeviceCollection));
+        }
     }
 }

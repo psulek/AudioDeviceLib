@@ -2,7 +2,6 @@
 
   <PropertyGroup>
     <TargetFrameworks>net48;netstandard2.0;net8.0-windows</TargetFrameworks>
-    <AppendTargetFrameworkToOutputPath>true</AppendTargetFrameworkToOutputPath>
 
     <ImplicitUsings>disable</ImplicitUsings>
     <Nullable>disable</Nullable>
@@ -17,7 +16,7 @@
       Targets .NET Framework 4.8, .NET Standard 2.0 and .NET 8 (Windows).
       Core Audio interop derived from AudioDeviceCmdlets (frgnca) / CoreAudioApi (Ray Molenkamp).
     </Description>
-    <Version>1.0.0-rc.1</Version>
+    <Version>1.0.0-rc.2</Version>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
 
@@ -32,9 +31,12 @@
     <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
 
-  <!-- Ship the repo-root README on the nuget.org package page (it lives one level up). -->
+  <!-- Ship the repo-root README on the nuget.org package page (it lives one level up), and the
+       third-party notices alongside it: the MIT terms this package incorporates require the notice
+       to travel with every copy, including the binary one. -->
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\" />
+    <None Include="..\THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <!-- Build-time-only: lets the .NET SDK compile the net48 target without a machine-wide

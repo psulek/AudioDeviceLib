@@ -33,6 +33,9 @@
     directives removed.
   - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
     documentation comments.
+  - Added the `VarType` and `IsEmpty` accessors, exposing the previously private `vt` tag.
+  - `Value` now returns `null` for `VT_EMPTY`/`VT_NULL` instead of falling through to the
+    "FIXME Type = ..." diagnostic string.
 */
 
 using System;
@@ -78,10 +81,23 @@ public struct PropVariant
         return Result;
     }
 
+    /// <summary>Gets the variant type tag of this value.</summary>
+    public VarEnum VarType
+    {
+        get { return (VarEnum)vt; }
+    }
+
+    /// <summary>Gets whether this variant carries no value.</summary>
+    public bool IsEmpty
+    {
+        get { return vt == (short)VarEnum.VT_EMPTY || vt == (short)VarEnum.VT_NULL; }
+    }
+
     /// <summary>Gets the variant value converted to a managed object based on its variant type.</summary>
     /// <returns>
-    /// The value as a managed type for supported variant types (integers, string, blob), or a
-    /// diagnostic string for variant types that are not yet handled.
+    /// The value as a managed type for supported variant types (integers, string, blob),
+    /// <c>null</c> when the variant is empty, or a diagnostic string for variant types that are not
+    /// yet handled.
     /// </returns>
     public object Value
     {
@@ -90,6 +106,12 @@ public struct PropVariant
             VarEnum ve = (VarEnum)vt;
             switch (ve)
             {
+                // An absent property comes back from IPropertyStore::GetValue as S_OK + VT_EMPTY.
+                // Falling through to the diagnostic string below would hand that text back as if it
+                // were the value, and being a string it would survive a (string) cast unnoticed.
+                case VarEnum.VT_EMPTY:
+                case VarEnum.VT_NULL:
+                    return null;
                 case VarEnum.VT_I1:
                     return bVal;
                 case VarEnum.VT_I2:

@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- One leg per shipped library asset. netstandard2.0 cannot be targeted directly (it is a
+         reference contract, not a runtime), so net7.0-windows stands in for it: net8.0-windows is
+         too new for a net7 consumer and net48 is incompatible, leaving netstandard2.0 as the only
+         asset NuGet can pick. LoadedLibraryAssetTests asserts that at runtime. -->
+    <TargetFrameworks>net48;net7.0-windows;net8.0-windows</TargetFrameworks>
+
+    <!-- `Major`, not `LatestMajor`: LatestMajor jumps to the newest installed runtime even when an
+         exact match exists, which would run every leg on the same runtime and defeat the split.
+         `Major` uses 7.0 and 8.0 when present and only rolls forward if one is missing. -->
+    <RollForward>Major</RollForward>
+
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>disable</Nullable>
+    <IsPackable>false</IsPackable>
+    <RootNamespace>AudioDeviceLib.UnitTests</RootNamespace>
+    <AssemblyName>AudioDeviceLib.UnitTests</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Microsoft.NET.Test.Sdk is pinned to 17.x deliberately: 18.x ships build assets for net462
+         and net8.0 only, which a net7.0-windows consumer matches neither of, so the netstandard2.0
+         leg would fail to restore. 17.9.0 ships net462 + netcoreapp3.1 and covers all three. -->
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.9.0" />
+    <PackageReference Include="NUnit" Version="4.4.0" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
+  </ItemGroup>
+
+  <!-- Build-time-only: lets the .NET SDK compile the net48 target without a machine-wide
+       .NET Framework Developer Pack. No runtime dependency (PrivateAssets=all). -->
+  <ItemGroup Condition="'$(TargetFrameworkIdentifier)' == '.NETFramework'">
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Library\AudioDeviceLib.csproj" />
+  </ItemGroup>
+
+</Project>

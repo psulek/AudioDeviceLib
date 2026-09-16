@@ -1,0 +1,271 @@
+/*
+  Copyright (c) 2026 Peter Šulek
+  MIT License
+
+  DeviceTests.cs
+  Tests that need a real audio endpoint. Each one skips via Assert.Ignore when the machine
+  has none, so a headless CI run reports them as skipped rather than failing.
+
+  Getters only: nothing here changes volume, mute or the default device.
+*/
+
+using System;
+using System.Collections.Generic;
+using AudioDeviceLib.CoreAudioApi;
+using AudioDeviceLib.Lib;
+using NUnit.Framework;
+
+namespace AudioDeviceLib.UnitTests;
+
+[TestFixture]
+public class DeviceTests
+{
+    [Test]
+    public void DefaultPlayback_HasIdAndName()
+    {
+        using var audio = new AudioController();
+        using AudioDevice device = AudioFixture.RequireDefaultPlayback(audio);
+
+        Assert.That(device.Id, Is.Not.Null.And.Not.Empty);
+        Assert.That(device.Name, Is.Not.Null.And.Not.Empty);
+        Assert.That(device.Kind, Is.EqualTo(AudioDeviceKind.Playback));
+        Assert.That(device.IsDefault, Is.True, "the endpoint resolved by the multimedia role must report IsDefault");
+    }
+
+    [Test]
+    public void GetDeviceById_RoundTripsById()
+    {
+        using var audio = new AudioController();
+        using AudioDevice original = AudioFixture.RequireDefaultPlayback(audio);
+
+        using AudioDevice resolved = audio.GetDeviceById(original.Id);
+
+        Assert.That(resolved.Id, Is.EqualTo(original.Id));
+        Assert.That(resolved.Name, Is.EqualTo(original.Name));
+        Assert.That(resolved.Kind, Is.EqualTo(original.Kind));
+    }
+
+    // Core Audio hands out a distinct COM object per acquisition, so two handles on one endpoint are
+    // never reference-equal. Equality has to come from the ID.
+    [Test]
+    public void Equals_IsByIdNotByReference()
+    {
+        using var audio = new AudioController();
+        using AudioDevice a = AudioFixture.RequireDefaultPlayback(audio);
+        using AudioDevice b = audio.GetDeviceById(a.Id);
+
+        Assert.That(ReferenceEquals(a, b), Is.False, "expected distinct wrappers");
+        Assert.That(a, Is.EqualTo(b));
+        Assert.That(a.GetHashCode(), Is.EqualTo(b.GetHashCode()));
+    }
+
+    [Test]
+    public void Snapshot_StaysReadableAfterDispose()
+    {
+        using var audio = new AudioController();
+        AudioDevice device = AudioFixture.RequireDefaultPlayback(audio);
+
+        string id = device.Id;
+        string name = device.Name;
+        AudioDeviceKind kind = device.Kind;
+        DeviceState state = device.State;
+
+        device.Dispose();
+
+        Assert.That(device.Id, Is.EqualTo(id));
+        Assert.That(device.Name, Is.EqualTo(name));
+        Assert.That(device.Kind, Is.EqualTo(kind));
+        Assert.That(device.State, Is.EqualTo(state));
+        Assert.DoesNotThrow(() => device.ToDeviceInfo());
+        Assert.DoesNotThrow(() => device.ToString());
+    }
+
+    [Test]
+    public void Device_AfterDispose_ComMembersThrowObjectDisposed()
+    {
+        using var audio = new AudioController();
+        AudioDevice device = AudioFixture.RequireDefaultPlayback(audio);
+        device.Dispose();
+
+        Assert.Throws<ObjectDisposedException>(() => { var _ = device.Volume; });
+        Assert.Throws<ObjectDisposedException>(() => { var _ = device.Properties; });
+        Assert.Throws<ObjectDisposedException>(() => { var _ = device.SessionManager; });
+        Assert.Throws<ObjectDisposedException>(() => { var _ = device.Meter; });
+        Assert.Throws<ObjectDisposedException>(() => device.Refresh());
+    }
+
+    [Test]
+    public void Device_DoubleDispose_IsNoOp()
+    {
+        using var audio = new AudioController();
+        AudioDevice device = AudioFixture.RequireDefaultPlayback(audio);
+
+        device.Dispose();
+        Assert.DoesNotThrow(() => device.Dispose());
+    }
+
+    [Test]
+    public void GetVolumePercent_IsBetween0And100()
+    {
+        using var audio = new AudioController();
+        using AudioDevice device = AudioFixture.RequireDefaultPlayback(audio);
+
+        float volume = device.GetVolumePercent();
+        Assert.That(volume, Is.InRange(0f, 100f));
+    }
+
+    [Test]
+    public void IsMuted_ReadsWithoutThrowing()
+    {
+        using var audio = new AudioController();
+        using AudioDevice device = AudioFixture.RequireDefaultPlayback(audio);
+
+        Assert.DoesNotThrow(() => { bool _ = device.IsMuted; });
+    }
+
+    [Test]
+    public void GetPeakValue_IsBetween0And1()
+    {
+        using var audio = new AudioController();
+        using AudioDevice device = AudioFixture.RequireDefaultPlayback(audio);
+
+        float peak = device.GetPeakValue();
+        Assert.That(peak, Is.InRange(0f, 1f));
+    }
+
+    [Test]
+    public void ToDeviceInfo_MatchesDevice()
+    {
+        using var audio = new AudioController();
+        using AudioDevice device = AudioFixture.RequireDefaultPlayback(audio);
+
+        AudioDeviceInfo info = device.ToDeviceInfo();
+
+        Assert.That(info.Id, Is.EqualTo(device.Id));
+        Assert.That(info.Name, Is.EqualTo(device.Name));
+        Assert.That(info.Kind, Is.EqualTo(device.Kind));
+        Assert.That(info.State, Is.EqualTo(device.State));
+        Assert.That(info.IsDefault, Is.EqualTo(device.IsDefault));
+        Assert.That(info.IsDefaultCommunication, Is.EqualTo(device.IsDefaultCommunication));
+    }
+
+    [Test]
+    public void GetDeviceInfo_MatchesGetDeviceById()
+    {
+        using var audio = new AudioController();
+        using AudioDevice device = AudioFixture.RequireDefaultPlayback(audio);
+
+        AudioDeviceInfo info = audio.GetDeviceInfo(device.Id);
+
+        Assert.That(info, Is.Not.Null);
+        Assert.That(info.Id, Is.EqualTo(device.Id));
+        Assert.That(info.Name, Is.EqualTo(device.Name));
+    }
+
+    // IPropertyStore::GetValue returns S_OK with a VT_EMPTY variant for a key that is not in the
+    // store - success, not failure. TryGetValue has to treat emptiness as "not found", otherwise the
+    // caller gets an empty PropVariant reported as a hit.
+    [Test]
+    public void Properties_TryGetValue_AbsentKey_ReturnsFalseAndEmptyVariant()
+    {
+        using var audio = new AudioController();
+        using AudioDevice device = AudioFixture.RequireDefaultPlayback(audio);
+
+        var absent = new PropertyKey
+        {
+            fmtid = new Guid("DEADBEEF-1111-2222-3333-444455556666"),
+            pid = 42,
+        };
+
+        bool found = device.Properties.TryGetValue(absent, out PropVariant value);
+
+        Assert.That(found, Is.False, "an absent key must not report as found");
+        Assert.That(value.IsEmpty, Is.True);
+        Assert.That(value.Value, Is.Null, "PropVariant.Value must be null for VT_EMPTY, not a placeholder string");
+    }
+
+    [Test]
+    public void Properties_TryGetValue_PresentKey_ReturnsTrue()
+    {
+        using var audio = new AudioController();
+        using AudioDevice device = AudioFixture.RequireDefaultPlayback(audio);
+
+        bool found = device.Properties.TryGetValue(PKEY.PKEY_DeviceInterface_FriendlyName, out PropVariant value);
+
+        Assert.That(found, Is.True);
+        Assert.That(value.IsEmpty, Is.False);
+        Assert.That(value.Value, Is.EqualTo(device.Name));
+    }
+
+    // If the absent-key handling above ever regressed, the unhandled-variant fallback string would
+    // surface as a device name. This is the cheap end-to-end guard for that.
+    [Test]
+    public void DeviceNames_AreNotPlaceholders()
+    {
+        using var audio = new AudioController();
+        AudioFixture.RequireAnyDevice(audio, out IReadOnlyList<AudioDevice> all);
+
+        try
+        {
+            foreach (AudioDevice device in all)
+            {
+                Assert.That(device.Name, Does.Not.Contain("FIXME"),
+                    "a PropVariant fallback string leaked into a device name");
+            }
+        }
+        finally
+        {
+            AudioFixture.DisposeAll(all);
+        }
+    }
+
+    [Test]
+    public void EnumeratedDevice_IsActive_WhenFilteredToActive()
+    {
+        using var audio = new AudioController();
+        AudioFixture.RequireAnyDevice(audio, out IReadOnlyList<AudioDevice> all);
+
+        try
+        {
+            foreach (AudioDevice device in all)
+            {
+                Assert.That(device.State, Is.EqualTo(DeviceState.Active));
+                Assert.That(device.IsActive, Is.True);
+            }
+        }
+        finally
+        {
+            AudioFixture.DisposeAll(all);
+        }
+    }
+
+    [Test]
+    public void Refresh_KeepsIdentityStable()
+    {
+        using var audio = new AudioController();
+        using AudioDevice device = AudioFixture.RequireDefaultPlayback(audio);
+
+        string id = device.Id;
+        string name = device.Name;
+
+        device.Refresh();
+
+        Assert.That(device.Id, Is.EqualTo(id));
+        Assert.That(device.Name, Is.EqualTo(name));
+    }
+
+    [Test]
+    public void StaticGetters_AgreeWithInstanceApi()
+    {
+        using var audio = new AudioController();
+        using AudioDevice device = AudioFixture.RequireDefaultPlayback(audio);
+
+        AudioDeviceInfo viaStatic = AudioController.GetDefaultPlayback();
+
+        Assert.That(viaStatic.Id, Is.EqualTo(device.Id));
+        Assert.That(AudioController.GetVolume(), Is.EqualTo(device.GetVolumePercent()).Within(0.5f));
+        Assert.That(AudioController.IsMuted(), Is.EqualTo(device.IsMuted));
+        Assert.That(AudioController.GetVolume(device.Id), Is.EqualTo(device.GetVolumePercent()).Within(0.5f));
+        Assert.That(AudioController.IsMuted(device.Id), Is.EqualTo(device.IsMuted));
+    }
+}

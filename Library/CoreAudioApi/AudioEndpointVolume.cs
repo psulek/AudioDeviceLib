@@ -33,6 +33,7 @@
     directives removed.
   - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
     documentation comments.
+  - Added a `_disposed` flag and a `ThrowIfDisposed()` guard on the members that call into COM.
   - Disposal reworked: added a `Dispose(bool)` pattern with `GC.SuppressFinalize`, routed the
     finalizer through it, and made `UnregisterControlChangeNotify` best-effort so no exception
     can escape `Dispose` (throwing from the finalizer thread would crash the process).
@@ -57,6 +58,7 @@ public class AudioEndpointVolume : IDisposable
     private AudioEndPointVolumeVolumeRange _VolumeRange;
     private EndpointHardwareSupport _HardwareSupport;
     private AudioEndpointVolumeCallback _CallBack;
+    private bool _disposed;
 
     /// <summary>Raised when the endpoint volume or mute state changes.</summary>
     public event AudioEndpointVolumeNotificationDelegate OnVolumeNotification;
@@ -79,10 +81,15 @@ public class AudioEndpointVolume : IDisposable
     {
         get
         {
+            ThrowIfDisposed();
             Marshal.ThrowExceptionForHR(_AudioEndPointVolume.GetMasterVolumeLevel(out var result));
             return result;
         }
-        set => Marshal.ThrowExceptionForHR(_AudioEndPointVolume.SetMasterVolumeLevel(value, Guid.Empty));
+        set
+        {
+            ThrowIfDisposed();
+            Marshal.ThrowExceptionForHR(_AudioEndPointVolume.SetMasterVolumeLevel(value, Guid.Empty));
+        }
     }
 
     /// <summary>Gets or sets the master volume as a normalized scalar in the range 0.0 to 1.0.</summary>
@@ -91,10 +98,15 @@ public class AudioEndpointVolume : IDisposable
     {
         get
         {
+            ThrowIfDisposed();
             Marshal.ThrowExceptionForHR(_AudioEndPointVolume.GetMasterVolumeLevelScalar(out var result));
             return result;
         }
-        set => Marshal.ThrowExceptionForHR(_AudioEndPointVolume.SetMasterVolumeLevelScalar(value, Guid.Empty));
+        set
+        {
+            ThrowIfDisposed();
+            Marshal.ThrowExceptionForHR(_AudioEndPointVolume.SetMasterVolumeLevelScalar(value, Guid.Empty));
+        }
     }
 
     /// <summary>Gets or sets the mute state of the endpoint.</summary>
@@ -103,16 +115,22 @@ public class AudioEndpointVolume : IDisposable
     {
         get
         {
+            ThrowIfDisposed();
             Marshal.ThrowExceptionForHR(_AudioEndPointVolume.GetMute(out var result));
             return result;
         }
-        set => Marshal.ThrowExceptionForHR(_AudioEndPointVolume.SetMute(value, Guid.Empty));
+        set
+        {
+            ThrowIfDisposed();
+            Marshal.ThrowExceptionForHR(_AudioEndPointVolume.SetMute(value, Guid.Empty));
+        }
     }
 
     /// <summary>Increases the master volume by one hardware-defined step.</summary>
     /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public void VolumeStepUp()
     {
+        ThrowIfDisposed();
         Marshal.ThrowExceptionForHR(_AudioEndPointVolume.VolumeStepUp(Guid.Empty));
     }
 
@@ -120,6 +138,7 @@ public class AudioEndpointVolume : IDisposable
     /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public void VolumeStepDown()
     {
+        ThrowIfDisposed();
         Marshal.ThrowExceptionForHR(_AudioEndPointVolume.VolumeStepDown(Guid.Empty));
     }
 
@@ -153,6 +172,8 @@ public class AudioEndpointVolume : IDisposable
 
     private void Dispose(bool disposing)
     {
+        _disposed = true;
+
         if (_CallBack != null)
         {
             try
@@ -166,6 +187,14 @@ public class AudioEndpointVolume : IDisposable
             }
 
             _CallBack = null;
+        }
+    }
+
+    private void ThrowIfDisposed()
+    {
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(nameof(AudioEndpointVolume));
         }
     }
 

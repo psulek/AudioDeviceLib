@@ -26,6 +26,23 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
+          # The unit tests multi-target net48 / net7.0-windows / net8.0-windows. The net7 leg is
+          # what exercises the shipped netstandard2.0 asset, so it needs a 7.0 runtime; the test
+          # project also sets RollForward as a fallback.
+          dotnet-version: 7.0.x
+
+      # Gate the release on the tests. Tests run before Pack so a tag that fails publishes nothing.
+      # An explicit project path, never a forward-slash glob: `dotnet` does not expand those on a
+      # Windows runner (see the Push step below for the same lesson).
+      - name: Test
+        run: dotnet test Library.UnitTests/Library.UnitTests.csproj -c Release --logger "trx;LogFileName=test-results.trx" --results-directory test-results
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: test-results
 
       - name: Determine version
         id: ver

@@ -9,4 +9,5 @@
     <File Path="THIRD-PARTY-NOTICES.md" />
   </Folder>
   <Project Path="Library.Test/Library.Test.csproj" />
+  <Project Path="Library.UnitTests/Library.UnitTests.csproj" />
 </Solution>

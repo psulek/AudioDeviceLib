@@ -3,18 +3,32 @@
 Internal design notes for AudioDeviceLib. Not linked from the public README — this
 is for contributors.
 
-`AudioController` is the entry point. It enumerates endpoints through an
-`MMDeviceEnumerator`, hands back `AudioDevice` facades, and sets the default device
-via the undocumented `PolicyConfigClient`. Each `AudioDevice` wraps an `MMDevice`,
-which lazily activates the volume, session and metering sub-interfaces. Most of the
-graph implements `IDisposable`.
+`AudioController` is the entry point. It holds the `IMMDeviceEnumerator` directly
+(created lazily), hands back `AudioDevice` instances, and sets the default device via
+the undocumented `PolicyConfigClient`. `AudioDevice` is the single device type: it wraps
+the `IMMDevice` itself, snapshots identity and state at construction, and lazily
+activates the volume, session and metering sub-interfaces. Most of the graph implements
+`IDisposable`.
+
+Two invariants worth knowing before changing anything here:
+
+- **Nothing is shared.** Core Audio returns a distinct COM object for every acquisition,
+  on every path (`GetDevice`, `IMMDeviceCollection::Item`, `GetDefaultAudioEndpoint`), even
+  for the same endpoint ID. So every `AudioDevice` owns its own RCW and disposing one can
+  never strand another. This is what makes returning fresh instances safe, and it is why
+  there is no device cache.
+- **Deterministic COM release is limited to objects that never escape.** The enumerator,
+  the `IMMDeviceCollection`, and the throwaway endpoint inside `TryGetDefaultId` are
+  released with `Marshal.ReleaseComObject`. The device's own `IMMDevice` and the
+  sub-interface RCWs are not: consumers can hold those, and each wrapper holds exactly one
+  reference, so one stray double-release would throw `InvalidComObjectException`.
 
 ```mermaid
 classDiagram
     direction LR
 
     class AudioController {
-        -MMDeviceEnumerator _enumerator
+        -IMMDeviceEnumerator _realEnumerator
         +GetDevices(DataFlowFilter, DeviceStateFilter) IReadOnlyList~AudioDevice~
         +GetPlaybackDevices(DeviceStateFilter) IReadOnlyList~AudioDevice~
         +GetRecordingDevices(DeviceStateFilter) IReadOnlyList~AudioDevice~
@@ -50,35 +64,25 @@ classDiagram
     }
 
     class AudioDevice {
+        -IMMDevice _realDevice
         +bool IsDefault
         +bool IsDefaultCommunication
         +AudioDeviceKind Kind
         +string Name
         +string Id
-        +MMDevice Device
+        +DeviceState State
+        +bool IsActive
+        +AudioEndpointVolume Volume
+        +AudioSessionManager SessionManager
+        +AudioMeterInformation Meter
+        +PropertyStore Properties
         +bool IsMuted
+        +Refresh() void
+        +ToDeviceInfo() AudioDeviceInfo
         +GetVolumePercent() float
         +SetVolumePercent(float percent) void
-        +ToggleMute() void
+        +ToggleMute() bool
         +GetPeakValue() float
-        +Dispose() void
-    }
-
-    class MMDeviceEnumerator {
-        +EnumerateAudioEndPoints(DataFlowFilter, DeviceStateFilter) MMDeviceCollection
-        +GetDefaultAudioEndpoint(DataFlow, Role) MMDevice
-        +GetDevice(string ID) MMDevice
-    }
-
-    class MMDevice {
-        +AudioSessionManager AudioSessionManager
-        +AudioEndpointVolume AudioEndpointVolume
-        +AudioMeterInformation AudioMeterInformation
-        +PropertyStore Properties
-        +string FriendlyName
-        +string ID
-        +DataFlow DataFlow
-        +DeviceState State
         +Dispose() void
     }
 
@@ -169,29 +173,26 @@ classDiagram
         +Dispose() void
     }
 
-    AudioController o-- MMDeviceEnumerator : uses
+    AudioController ..> MMDeviceCollection : enumerates
     AudioController ..> AudioDevice : creates
     AudioController ..> PolicyConfigClient : sets default via
     AudioController ..> DefaultRole : parameter
-    AudioDevice *-- MMDevice : wraps
+    MMDeviceCollection ..> AudioDevice : yields
     AudioDevice ..> AudioDeviceKind
     AudioDevice ..> AudioDeviceInfo : ToDeviceInfo() snapshot
     AudioController ..> AudioDeviceInfo : static API returns
     AudioController ..> DataFlowFilter : query parameter
     AudioController ..> DeviceStateFilter : query parameter
-    MMDeviceEnumerator ..> DataFlowFilter : query parameter
-    MMDeviceEnumerator ..> DeviceStateFilter : query parameter
-    MMDevice ..> DataFlow : single value
-    MMDevice ..> DeviceState : single value
-    MMDeviceEnumerator ..> MMDevice : returns
-    MMDevice *-- "0..1" AudioEndpointVolume
-    MMDevice *-- "0..1" AudioSessionManager
+    AudioController ..> DataFlow : single value
+    AudioDevice ..> DeviceState : single value
+    AudioDevice *-- "0..1" AudioEndpointVolume
+    AudioDevice *-- "0..1" AudioSessionManager
     AudioSessionManager *-- SessionCollection
     SessionCollection o-- "*" AudioSessionControl
 
     IDisposable <|.. AudioController
     IDisposable <|.. AudioDevice
-    IDisposable <|.. MMDevice
+    IDisposable <|.. MMDeviceCollection
     IDisposable <|.. AudioSessionManager
     IDisposable <|.. SessionCollection
     IDisposable <|.. AudioSessionControl

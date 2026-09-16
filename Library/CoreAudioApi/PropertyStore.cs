@@ -33,6 +33,9 @@
     directives removed.
   - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
     documentation comments.
+  - Added `TryGetValue`, a direct `IPropertyStore::GetValue` lookup that replaces the linear scans
+    for the common "fetch one known key" case.
+  - `Count` is no longer re-evaluated inside loop conditions; each scan reads it once.
 */
 
 using System;
@@ -78,7 +81,8 @@ public class PropertyStore
     /// <returns><c>true</c> if a property with the matching set GUID exists; otherwise <c>false</c>.</returns>
     public bool Contains(Guid guid)
     {
-        for (int i = 0; i < Count; i++)
+        int count = Count;
+        for (int i = 0; i < count; i++)
         {
             PropertyKey key = Get(i);
             if (key.fmtid == guid)
@@ -98,7 +102,8 @@ public class PropertyStore
     {
         get
         {
-            for (int i = 0; i < Count; i++)
+            int count = Count;
+            for (int i = 0; i < count; i++)
             {
                 PropertyKey key = Get(i);
                 if (key.fmtid == guid)
@@ -138,7 +143,8 @@ public class PropertyStore
     /// <returns><c>true</c> if a matching property exists; otherwise <c>false</c>.</returns>
     public bool Contains(PropertyKey compareKey)
     {
-        for (int i = 0; i < Count; i++)
+        int count = Count;
+        for (int i = 0; i < count; i++)
         {
             PropertyKey key = Get(i);
             if (key.fmtid == compareKey.fmtid && key.pid == compareKey.pid)
@@ -158,7 +164,8 @@ public class PropertyStore
     {
         get
         {
-            for (int i = 0; i < Count; i++)
+            int count = Count;
+            for (int i = 0; i < count; i++)
             {
                 PropertyKey key = Get(i);
                 if (key.fmtid == queryKey.fmtid && key.pid == queryKey.pid)
@@ -170,6 +177,25 @@ public class PropertyStore
 
             return null;
         }
+    }
+
+    /// <summary>Reads the value of a single property by key, without scanning the store.</summary>
+    /// <param name="key">The property key (set GUID and property id) to read.</param>
+    /// <param name="value">The value read, or an empty variant when the key is not present.</param>
+    /// <returns><c>true</c> if the store holds a value for <paramref name="key"/>; otherwise <c>false</c>.</returns>
+    public bool TryGetValue(PropertyKey key, out PropVariant value)
+    {
+        // IPropertyStore::GetValue takes the key directly, so this is one COM call where the
+        // indexers walk the whole store. It also does NOT fail for a missing key: it returns S_OK
+        // with a VT_EMPTY variant, which is why the emptiness check below is the real "found" test.
+        int hr = _Store.GetValue(ref key, out value);
+        if (hr != 0)
+        {
+            value = default(PropVariant);
+            return false;
+        }
+
+        return !value.IsEmpty;
     }
 
     internal PropertyStore(IPropertyStore store)

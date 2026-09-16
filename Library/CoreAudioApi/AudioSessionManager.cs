@@ -33,6 +33,7 @@
     directives removed.
   - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
     documentation comments.
+  - `Dispose` is idempotent and `Sessions` is guarded by `ThrowIfDisposed()`.
   - Now implements `IDisposable` and disposes its `SessionCollection`.
 */
 
@@ -50,6 +51,7 @@ public class AudioSessionManager : IDisposable
 {
     private IAudioSessionManager2 _AudioSessionManager;
     private SessionCollection _Sessions;
+    private bool _disposed;
 
     internal AudioSessionManager(IAudioSessionManager2 realAudioSessionManager)
     {
@@ -59,11 +61,36 @@ public class AudioSessionManager : IDisposable
     }
 
     /// <summary>Gets the collection of audio sessions currently associated with the endpoint.</summary>
-    public SessionCollection Sessions => _Sessions;
+    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed.</exception>
+    public SessionCollection Sessions
+    {
+        get
+        {
+            ThrowIfDisposed();
+            return _Sessions;
+        }
+    }
 
     /// <summary>Disposes the owned <see cref="SessionCollection"/> (and its cached sessions).</summary>
     public void Dispose()
     {
+        if (_disposed)
+        {
+            return;
+        }
+
+        _disposed = true;
+
         _Sessions?.Dispose();
+        _Sessions = null;
+        _AudioSessionManager = null;
+    }
+
+    private void ThrowIfDisposed()
+    {
+        if (_disposed)
+        {
+            throw new ObjectDisposedException(nameof(AudioSessionManager));
+        }
     }
 }
