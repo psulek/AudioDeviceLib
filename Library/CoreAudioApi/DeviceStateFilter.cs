@@ -1,4 +1,4 @@
-/*
+﻿/*
   LICENSE
   -------
   Copyright (C) 2007-2010 Ray Molenkamp
@@ -29,19 +29,8 @@
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
   Derived from `SOURCE/EDeviceState.cs` upstream.
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
-    documentation comments.
-  - Split out of the original `EDeviceState`: this is the query-side half, used only as the
-    `StateMask` that selects which endpoints an enumeration returns, where combining bits is
-    correct. The state-side half is `DeviceState`, which is not `[Flags]` and drops `All`, because
-    `IMMDevice::GetState` always reports exactly one state.
-  - Members renamed from `DEVICE_STATE_*` / `DEVICE_STATEMASK_ALL` to `Active`/`Disabled`/
-    `NotPresent`/`Unplugged`/`All`.
-  - Values corrected against the Windows SDK (`mmdeviceapi.h`): `Unplugged` is `0x8` (was `0x2`),
-    the missing `Disabled` (`0x2`) was added, and `All` is `0xF` (was `0x7`).
+  The changes are summarized in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 using System;

@@ -1,4 +1,4 @@
-/*
+﻿/*
   Copyright (c) 2026 Peter Šulek
   MIT License
 
@@ -11,22 +11,20 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using System.Threading;
 using AudioDeviceLib.CoreAudioApi.Interfaces;
-using AudioDeviceLib.Lib;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
 /// <summary>
-/// Internal COM sink that receives <see cref="IMMNotificationClient"/> callbacks and forwards them to
+/// Internal COM sink that receives <see cref="IMMNotificationClientCOM"/> callbacks and forwards them to
 /// a consumer's <see cref="IAudioDeviceEvents"/> instance.
 /// </summary>
 /// <remarks>
 /// THREADING: the wrapped callbacks are raised by Windows Core Audio on arbitrary, non-UI threads and
 /// may arrive concurrently. The forwarded consumer must be quick and thread-safe.
 /// </remarks>
-internal sealed class MMNotificationClientComAdapter : IMMNotificationClient
+internal sealed class MMNotificationClientComAdapter : IMMNotificationClientCOM
 {
     private const int S_OK = 0;
 
@@ -47,7 +45,7 @@ internal sealed class MMNotificationClientComAdapter : IMMNotificationClient
         }
         catch (Exception ex)
         {
-            return Marshal.GetHRForException(ex);
+            return InteropUtils.ReportFailure(ex);
         }
     }
 
@@ -60,7 +58,7 @@ internal sealed class MMNotificationClientComAdapter : IMMNotificationClient
         }
         catch (Exception ex)
         {
-            return Marshal.GetHRForException(ex);
+            return InteropUtils.ReportFailure(ex);
         }
     }
 
@@ -73,7 +71,7 @@ internal sealed class MMNotificationClientComAdapter : IMMNotificationClient
         }
         catch (Exception ex)
         {
-            return Marshal.GetHRForException(ex);
+            return InteropUtils.ReportFailure(ex);
         }
     }
 
@@ -86,7 +84,7 @@ internal sealed class MMNotificationClientComAdapter : IMMNotificationClient
         }
         catch (Exception ex)
         {
-            return Marshal.GetHRForException(ex);
+            return InteropUtils.ReportFailure(ex);
         }
     }
 
@@ -99,7 +97,7 @@ internal sealed class MMNotificationClientComAdapter : IMMNotificationClient
         }
         catch (Exception ex)
         {
-            return Marshal.GetHRForException(ex);
+            return InteropUtils.ReportFailure(ex);
         }
     }
 }
@@ -110,18 +108,19 @@ internal sealed class MMNotificationClientComAdapter : IMMNotificationClient
 /// </summary>
 internal sealed class DeviceEventsRegistration : IDisposable
 {
-    private AudioController _owner;
+    // NOTE: owner is never null from ctor arg but will be nulled on Dispose to prevent double-unregistering, so we need to make the field nullable.
+    private AudioController? _owner;
     private readonly MMNotificationClientComAdapter _adapter;
 
     internal DeviceEventsRegistration(AudioController owner, MMNotificationClientComAdapter adapter)
     {
-        _owner = owner;
-        _adapter = adapter;
+        _owner = owner ?? throw new ArgumentNullException(nameof(owner));
+        _adapter = adapter ?? throw new ArgumentNullException(nameof(adapter));
     }
 
     public void Dispose()
     {
-        AudioController owner = Interlocked.Exchange(ref _owner, null);
+        var owner = Interlocked.Exchange(ref _owner, null);
         owner?.RemoveDeviceRegistration(_adapter);
     }
 }
@@ -134,7 +133,7 @@ internal sealed class AudioDeviceEventsRefComparer : IEqualityComparer<IAudioDev
 {
     public static readonly AudioDeviceEventsRefComparer Instance = new AudioDeviceEventsRefComparer();
 
-    public bool Equals(IAudioDeviceEvents x, IAudioDeviceEvents y) => ReferenceEquals(x, y);
+    public bool Equals(IAudioDeviceEvents? x, IAudioDeviceEvents? y) => ReferenceEquals(x, y);
 
     public int GetHashCode(IAudioDeviceEvents obj) => RuntimeHelpers.GetHashCode(obj);
 }

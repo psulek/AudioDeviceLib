@@ -8,3 +8,26 @@ artifacts/
 .idea/**/vcs.xml
 
 _published
+code-review.md
+
+# Local agent skills; not part of the shipped repo (.github/workflows stays tracked)
+.github/skills/
+
+# Local agent instructions
+AGENTS.md
+
+# Scratch probes and experiments
+temp/
+.tools/
+build-review.log
+TestResults/
+coverage/
+*.received.*
+test-review.log
+analysis-review.log
+docs/handoff.md
+# Generated DocFX output
+_site/
+docfx/api/**
+!docfx/api/index.md
+docfx/obj/

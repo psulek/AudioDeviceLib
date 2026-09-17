@@ -1,4 +1,4 @@
-/*
+﻿/*
   LICENSE
   -------
   Copyright (C) 2007-2010 Ray Molenkamp
@@ -28,32 +28,53 @@
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
-    documentation comments.
+  The changes are summarized in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
-using System.Runtime.InteropServices;
+using System;
 using AudioDeviceLib.CoreAudioApi.Interfaces;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
 /// <summary>Describes the discrete volume steps available on an audio endpoint.</summary>
-public class AudioEndpointVolumeStepInformation
+public sealed class AudioEndpointVolumeStepInformation : IDisposable
 {
-    private uint _Step;
-    private uint _StepCount;
+    private readonly IAudioEndpointVolumeCOM _parent;
 
-    internal AudioEndpointVolumeStepInformation(IAudioEndpointVolume parent)
+    internal AudioEndpointVolumeStepInformation(IAudioEndpointVolumeCOM parent)
     {
-        Marshal.ThrowExceptionForHR(parent.GetVolumeStepInfo(out _Step, out _StepCount));
+        _parent = parent;
     }
 
     /// <summary>Gets the current, zero-based volume step index.</summary>
-    public uint Step => _Step;
+    public uint Step
+    {
+        get
+        {
+            ThrowIfDisposed();
+            InteropUtils.ThrowIfFailed(_parent.GetVolumeStepInfo(out var step, out _));
+            return step;
+        }
+    }
 
     /// <summary>Gets the total number of volume steps supported by the endpoint.</summary>
-    public uint StepCount => _StepCount;
+    public uint StepCount
+    {
+        get
+        {
+            ThrowIfDisposed();
+            InteropUtils.ThrowIfFailed(_parent.GetVolumeStepInfo(out _, out var count));
+            return count;
+        }
+    }
+    private volatile bool _disposed;
+
+    /// <summary>Invalidates this wrapper without releasing externally held COM references.</summary>
+    public void Dispose() => _disposed = true;
+
+    private void ThrowIfDisposed()
+    {
+        InteropUtils.RequireNotDisposed(_disposed, this);
+    }
 }

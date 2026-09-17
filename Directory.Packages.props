@@ -1,0 +1,23 @@
+﻿<Project>
+  <PropertyGroup>
+    <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
+    <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageVersion Include="coverlet.collector" Version="6.0.4" />
+    <PackageVersion Include="JetBrains.Annotations" Version="2026.2.0" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="17.9.0" />
+    <!-- NUnit3TestAdapter ships nunit.engine.dll as loose files rather than as a package
+         library, so restore never sees the engine's own dependency on DependencyModel. The
+         .NET Core test host then fails to load the engine. 8.0.2 carries assembly version
+         8.0.0.2, which is what nunit.engine binds to. -->
+    <PackageVersion Include="Microsoft.Extensions.DependencyModel" Version="8.0.2" />
+    <PackageVersion Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" />
+    <PackageVersion Include="NUnit" Version="4.4.0" />
+    <PackageVersion Include="NUnit3TestAdapter" Version="4.6.0" />
+    <PackageVersion Include="PolySharp" Version="1.16.0" PrivateAssets="all" />
+    <PackageVersion Include="PublicApiGenerator" Version="11.5.4" />
+    <PackageVersion Include="System.Text.Json" Version="8.0.6" />
+    <PackageVersion Include="Verify.NUnit" Version="28.0.0" />
+  </ItemGroup>
+</Project>

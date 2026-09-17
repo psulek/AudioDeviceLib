@@ -1,4 +1,4 @@
-/*
+﻿/*
   LICENSE
   -------
   Copyright (C) 2007-2010 Ray Molenkamp
@@ -28,29 +28,8 @@
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
-    documentation comments.
-  - Added the `VarType` and `IsEmpty` accessors, exposing the previously private `vt` tag.
-  - `Value` now returns `null` for `VT_EMPTY`/`VT_NULL` instead of falling through to the
-    "FIXME Type = ..." diagnostic string.
-  - `boolVal` and `date` retyped from `bool`/`DateTime` to `short`/`double`, the real widths of
-    `VARIANT_BOOL` and `DATE`. That also makes every field blittable, which is what lets the struct
-    reach `PropVariantClear` without the marshaller reinterpreting the union.
-  - Added `Clear()`. The original never released the memory a returned PROPVARIANT owns, so every
-    `VT_LPWSTR` or `VT_BLOB` read leaked its payload.
-  - `Value` now handles `VT_BOOL` and `VT_DATE`, which previously fell through to the
-    "FIXME Type = ..." diagnostic string despite the union carrying both.
-  - `VT_I1` read the unsigned `bVal` instead of the signed `cVal`, and `VT_INT` read the 2-byte
-    `iVal` instead of the 4-byte `lVal`, truncating every value above 16 bits. Both corrected.
-  - An unconverted variant type now yields `null` rather than the "FIXME Type = ..." string, which
-    a caller could not distinguish from a real string value.
-  - `Value` now reads every member of the union that carries a value: `VT_UI1`, `VT_UI2`, `VT_UI8`,
-    `VT_UINT`, `VT_R4`, `VT_R8`, `VT_ERROR` and `VT_FILETIME` were declared but never reachable.
-    The three `wReserved` fields remain unread: they are PROPVARIANT padding, not values.
-  - Cases reordered by width and kind so a missing one is visible at a glance.
+  The changes are summarized in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 using System;
@@ -61,7 +40,7 @@ namespace AudioDeviceLib.CoreAudioApi;
 
 /// <summary>Managed layout of the native <c>PROPVARIANT</c> used to read values from a property store.</summary>
 [StructLayout(LayoutKind.Explicit)]
-public struct PropVariant
+internal struct PropVariant
 {
     [FieldOffset(0)] short vt;
     [FieldOffset(2)] short wReserved1;
@@ -84,16 +63,21 @@ public struct PropVariant
     [FieldOffset(8)] System.Runtime.InteropServices.ComTypes.FILETIME filetime;
     [FieldOffset(8)] IntPtr everything_else;
 
-    //I'm sure there is a more efficient way to do this but this works ..for now..
-    internal byte[] GetBlob()
+    // Copy the blob before Clear frees its native storage.
+    // Marshal.Copy avoids per-byte pointer arithmetic and its 32-bit truncation risk.
+    private readonly byte[] GetBlob()
     {
-        byte[] Result = new byte[blobVal.Length];
-        for (int i = 0; i < blobVal.Length; i++)
+        // Treat nonpositive lengths and null pointers as empty.
+        // Unsigned sizes above int.MaxValue appear negative; Marshal.Copy requires a non-null source.
+        int length = blobVal.Length;
+        if (length <= 0 || blobVal.Data == IntPtr.Zero)
         {
-            Result[i] = Marshal.ReadByte((IntPtr)((long)(blobVal.Data) + i));
+            return Array.Empty<byte>();
         }
 
-        return Result;
+        var result = new byte[length];
+        Marshal.Copy(blobVal.Data, result, 0, length);
+        return result;
     }
 
     // A PROPVARIANT FILETIME is UTC. Returning DateTime.FromFileTime instead would shift the value
@@ -106,30 +90,82 @@ public struct PropVariant
         return DateTime.FromFileTimeUtc(ticks);
     }
 
-    // A PROPVARIANT handed back by IPropertyStore::GetValue belongs to the caller: for VT_LPWSTR and
-    // VT_BLOB the payload is allocated by the store and is leaked unless it is released. This is
-    // declared `ref` rather than as a raw pointer, which only works because every field above is
-    // blittable - a `bool` or `DateTime` field would make the marshaller try to convert the union
-    // and throw before the call is made.
+    // Clear releases caller-owned string and blob payloads returned by GetValue.
+    // Keep every union field blittable so ref marshalling remains valid.
     [DllImport("ole32.dll")]
     private static extern int PropVariantClear(ref PropVariant pvar);
 
     /// <summary>Releases the native memory this value owns and resets it to an empty variant.</summary>
     public void Clear()
     {
-        PropVariantClear(ref this);
+        InteropUtils.ThrowIfFailed(PropVariantClear(ref this));
     }
 
     /// <summary>Gets the variant type tag of this value.</summary>
-    public VarEnum VarType
-    {
-        get { return (VarEnum)vt; }
-    }
+    public VarEnum VarType => (VarEnum)vt;
 
     /// <summary>Gets whether this variant carries no value.</summary>
-    public bool IsEmpty
+    public bool IsEmpty => vt == (short)VarEnum.VT_EMPTY || vt == (short)VarEnum.VT_NULL;
+
+    /// <summary>Converts and clears an owned native variant.</summary>
+    public static PropertyValue ToPropertyValue(ref PropVariant variant)
     {
-        get { return vt == (short)VarEnum.VT_EMPTY || vt == (short)VarEnum.VT_NULL; }
+        object? val;
+        bool supported;
+        var varType = variant.VarType;
+        try
+        {
+            supported = variant.TryGetValue(out val);
+        }
+        finally
+        {
+            variant.Clear();
+        }
+
+        return new PropertyValue(varType, val, supported);
+    }
+
+    // Separates "converted to null" from "this class does not convert this variant type", which
+    // Value alone cannot express: both come back as a null object. A property that is present but
+    // carries an unconvertible type is not a value the caller can use, and saying so is the only
+    // way TryGetValue can avoid reporting success with nothing in hand.
+    private bool TryGetValue(out object? value)
+    {
+        switch (VarType)
+        {
+            case VarEnum.VT_EMPTY:
+            case VarEnum.VT_NULL:
+            case VarEnum.VT_I1:
+            case VarEnum.VT_I2:
+            case VarEnum.VT_I4:
+            case VarEnum.VT_INT:
+            case VarEnum.VT_I8:
+            case VarEnum.VT_UI1:
+            case VarEnum.VT_UI2:
+            case VarEnum.VT_UI4:
+            case VarEnum.VT_UINT:
+            case VarEnum.VT_UI8:
+            case VarEnum.VT_R4:
+            case VarEnum.VT_R8:
+            case VarEnum.VT_BOOL:
+            case VarEnum.VT_DATE:
+            case VarEnum.VT_FILETIME:
+            case VarEnum.VT_ERROR:
+            case VarEnum.VT_LPWSTR:
+            case VarEnum.VT_LPSTR:
+            case VarEnum.VT_BSTR:
+            case VarEnum.VT_CLSID:
+            case VarEnum.VT_BLOB:
+            {
+                value = Value;
+                return true;
+            }
+            default:
+            {
+                value = null;
+                return false;
+            }
+        }
     }
 
     /// <summary>Gets the variant value converted to a managed object based on its variant type.</summary>
@@ -139,7 +175,7 @@ public struct PropVariant
     /// carries a type this class does not convert. <see cref="VarType"/> distinguishes those two
     /// cases. File times are returned as UTC; OLE dates carry no zone and are returned unspecified.
     /// </returns>
-    public object Value
+    public object? Value
     {
         get
         {
@@ -151,50 +187,102 @@ public struct PropVariant
                 // though the fallback below also returns null, so the intent survives a later edit.
                 case VarEnum.VT_EMPTY:
                 case VarEnum.VT_NULL:
+                {
                     return null;
+                }
                 case VarEnum.VT_I1:
+                {
                     return cVal;
+                }
                 case VarEnum.VT_I2:
+                {
                     return iVal;
+                }
                 case VarEnum.VT_I4:
                 case VarEnum.VT_INT:
+                {
                     return lVal;
+                }
                 case VarEnum.VT_I8:
+                {
                     return hVal;
+                }
 
                 case VarEnum.VT_UI1:
+                {
                     return bVal;
+                }
                 case VarEnum.VT_UI2:
+                {
                     return uiVal;
+                }
                 case VarEnum.VT_UI4:
                 case VarEnum.VT_UINT:
+                {
                     return ulVal;
+                }
                 case VarEnum.VT_UI8:
+                {
                     return uhVal;
+                }
 
                 case VarEnum.VT_R4:
+                {
                     return fltVal;
+                }
                 case VarEnum.VT_R8:
+                {
                     return dblVal;
+                }
 
                 // VARIANT_BOOL is a 2-byte tri-state where true is -1 (0xFFFF) and false is 0, so
                 // this is a comparison against zero rather than a cast.
                 case VarEnum.VT_BOOL:
+                {
                     return boolVal != 0;
+                }
                 // DATE is an OLE Automation date: a double counting days since 1899-12-30.
                 case VarEnum.VT_DATE:
+                {
                     return DateTime.FromOADate(date);
+                }
                 case VarEnum.VT_FILETIME:
+                {
                     return FileTimeToUtc(filetime);
+                }
                 // An SCODE is an HRESULT, so it is handed back as the raw 32-bit status rather than
                 // being turned into an exception - this is a value being read, not a call failing.
                 case VarEnum.VT_ERROR:
+                {
                     return scode;
-
+                }
                 case VarEnum.VT_LPWSTR:
+                {
                     return Marshal.PtrToStringUni(everything_else);
+                }
+                case VarEnum.VT_LPSTR:
+                {
+                    return Marshal.PtrToStringAnsi(everything_else);
+                }
+                case VarEnum.VT_BSTR:
+                {
+                    return everything_else == IntPtr.Zero
+                        ? null
+                        : Marshal.PtrToStringBSTR(everything_else);
+                }
+                // The payload is a pointer to the GUID, not the GUID itself, so the copy has to be
+                // taken before Clear frees it. (Note that AudioEndpointGuid is not one of
+                // these: Core Audio stores that one as a VT_LPWSTR in registry-string form.)
+                case VarEnum.VT_CLSID:
+                {
+                    return everything_else == IntPtr.Zero
+                        ? null
+                        : Marshal.PtrToStructure<Guid>(everything_else);
+                }
                 case VarEnum.VT_BLOB:
+                {
                     return GetBlob();
+                }
             }
 
             // Not a diagnostic string: being a string, it would survive a (string) cast or an

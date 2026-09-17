@@ -28,19 +28,13 @@
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
-    documentation comments.
-  - The indexer now caches its `AudioSessionControl` wrappers behind a lock instead of allocating
-    a new wrapper on every access, and validates the index.
-  - Now implements `IDisposable`: disposal releases every cached session and subsequent access
-    throws `ObjectDisposedException`.
+  The changes are summarized in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 using System;
-using System.Runtime.InteropServices;
+using System.Collections;
+using System.Collections.Generic;
 using AudioDeviceLib.CoreAudioApi.Interfaces;
 
 namespace AudioDeviceLib.CoreAudioApi;
@@ -48,20 +42,29 @@ namespace AudioDeviceLib.CoreAudioApi;
 /// <summary>A collection of the <see cref="AudioSessionControl"/> sessions on an audio endpoint.</summary>
 /// <remarks>
 /// The underlying <c>IAudioSessionEnumerator</c> is a point-in-time snapshot with a fixed count,
-/// so this collection memoizes one <see cref="AudioSessionControl"/> per index: repeated access to
-/// the same index returns the same instance (important for registering and later unregistering
-/// session notifications on the same object).
+/// so its count is read once when this collection is created and never changes. The sessions
+/// themselves are built on first access and memoized one per index: repeated access to the same
+/// index returns the same instance (important for registering and later unregistering session
+/// notifications on the same object).
 /// </remarks>
-public class SessionCollection : IDisposable
+public sealed class SessionCollection : IDisposable, IReadOnlyList<AudioSessionControl>
 {
-    private readonly IAudioSessionEnumerator _AudioSessionEnumerator;
+    private readonly IAudioSessionEnumeratorCOM _enumerator;
     private readonly object _lock = new object();
-    private AudioSessionControl[] _cache;
+    private readonly int _count;
+    private AudioSessionControl?[]? _cache;
+    // Deliberately not volatile: the write and every guard check happen under _lock, which already
+    // supplies the ordering. Contrast AudioSessionControl, whose guard runs outside its lock.
     private bool _disposed;
 
-    internal SessionCollection(IAudioSessionEnumerator realEnumerator)
+    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
+    internal SessionCollection(IAudioSessionEnumeratorCOM audioSessionEnumerator)
     {
-        _AudioSessionEnumerator = realEnumerator;
+        this._enumerator = audioSessionEnumerator;
+
+        // Read the count once so enumeration bounds and cache size cannot disagree if a session ends.
+        InteropUtils.ThrowIfFailed(audioSessionEnumerator.GetCount(out var count));
+        _count = count;
     }
 
     /// <summary>Gets the session at the specified zero-based index (cached per index).</summary>
@@ -76,26 +79,28 @@ public class SessionCollection : IDisposable
             {
                 ThrowIfDisposed();
 
-                _cache ??= new AudioSessionControl[CountCore()];
+                _cache ??= new AudioSessionControl[_count];
 
                 if (index < 0 || index >= _cache.Length)
                 {
                     throw new ArgumentOutOfRangeException(nameof(index));
                 }
 
-                if (_cache[index] == null)
+                var result = _cache[index];
+                if (result is null)
                 {
-                    Marshal.ThrowExceptionForHR(_AudioSessionEnumerator.GetSession(index, out var _Result));
-                    _cache[index] = new AudioSessionControl(_Result);
+                    InteropUtils.ThrowIfFailed(_enumerator.GetSession(index, out var session));
+                    result = new AudioSessionControl(session);
+                    _cache[index] = result;
                 }
 
-                return _cache[index];
+                return result;
             }
         }
     }
 
-    /// <summary>Gets the number of sessions in the collection.</summary>
-    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
+    /// <summary>Gets the number of sessions in the collection, fixed when it was created.</summary>
+    /// <exception cref="System.ObjectDisposedException">Thrown when this collection has been disposed.</exception>
     public int Count
     {
         get
@@ -104,21 +109,15 @@ public class SessionCollection : IDisposable
             {
                 ThrowIfDisposed();
 
-                return _cache?.Length ?? CountCore();
+                return _count;
             }
         }
-    }
-
-    private int CountCore()
-    {
-        Marshal.ThrowExceptionForHR(_AudioSessionEnumerator.GetCount(out var result));
-        return result;
     }
 
     /// <summary>Disposes every <see cref="AudioSessionControl"/> this collection created.</summary>
     public void Dispose()
     {
-        AudioSessionControl[] toDispose;
+        AudioSessionControl?[]? toDispose;
         lock (_lock)
         {
             if (_disposed)
@@ -133,7 +132,7 @@ public class SessionCollection : IDisposable
 
         if (toDispose != null)
         {
-            foreach (AudioSessionControl session in toDispose)
+            foreach (var session in toDispose)
             {
                 session?.Dispose();
             }
@@ -143,9 +142,17 @@ public class SessionCollection : IDisposable
     // Callers hold _lock; the flag is only ever written under it.
     private void ThrowIfDisposed()
     {
-        if (_disposed)
+        InteropUtils.RequireNotDisposed(_disposed, this);
+    }
+    /// <summary>Enumerates the controls in this snapshot.</summary>
+    /// <returns>An enumerator over the snapshot.</returns>
+    public IEnumerator<AudioSessionControl> GetEnumerator()
+    {
+        for (int i = 0; i < Count; i++)
         {
-            throw new ObjectDisposedException(nameof(SessionCollection));
+            yield return this[i];
         }
     }
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }

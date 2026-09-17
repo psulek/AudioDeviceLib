@@ -9,7 +9,6 @@
 
 using System.Reflection;
 using System.Runtime.Versioning;
-using AudioDeviceLib.Lib;
 using NUnit.Framework;
 
 namespace AudioDeviceLib.UnitTests;
@@ -24,7 +23,7 @@ public class LoadedAssetTests
     [Test]
     public void LoadedLibraryAsset_MatchesExpectedTargetFramework()
     {
-        string actual = typeof(AudioController).Assembly
+        string? actual = typeof(AudioController).Assembly
             .GetCustomAttribute<TargetFrameworkAttribute>()
             ?.FrameworkName;
 

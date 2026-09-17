@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "isRoot": true,
+  "tools": {
+    "slopwatch.cmd": {
+      "version": "0.4.2",
+      "commands": [
+        "slopwatch"
+      ],
+      "rollForward": false
+    },
+    "dotnet-reportgenerator-globaltool": {
+      "version": "5.4.5",
+      "commands": [
+        "reportgenerator"
+      ],
+      "rollForward": false
+    },
+    "docfx": {
+      "version": "2.78.6",
+      "commands": [
+        "docfx"
+      ],
+      "rollForward": false
+    }
+  }
+}

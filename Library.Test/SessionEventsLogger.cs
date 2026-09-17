@@ -1,4 +1,4 @@
-/*
+﻿/*
   Copyright (c) 2026 Peter Šulek
   MIT License
 
@@ -19,39 +19,47 @@ namespace AudioDeviceLib.Test;
 internal sealed class SessionEventsLogger : IAudioSessionEvents
 {
     // Builds a short prefix identifying the session, using the info carried by the notification.
-    private static string Describe(AudioSessionInfo session)
+    private static string Describe(AudioSessionBaseInfo session)
     {
-        string name = !string.IsNullOrEmpty(session.DisplayName)
-            ? session.DisplayName
-            : session.IsSystemSoundsSession ? "System Sounds" : "session";
-        return $"{name} pid={session.ProcessID}";
+        string name = session.IsSystemSoundsSession ? "System Sounds" : "session";
+        if (session is AudioSessionInfo sessionInfo && !string.IsNullOrEmpty(sessionInfo.DisplayName))
+        {
+            name = sessionInfo.DisplayName;
+        }
+        
+        return $"{name} PropertyId ={session.ProcessId}";
     }
 
-    public void OnDisplayNameChanged(AudioSessionInfo session, string newDisplayName, Guid eventContext)
+    // A null context means the caller that made the change supplied none - render it distinctly,
+    // because a null Guid? interpolates to the empty string and would read as a blank context.
+    private static string Describe(Guid? eventContext) =>
+        eventContext?.ToString() ?? "<null>";
+
+    public void OnDisplayNameChanged(AudioSessionInfo session, string newDisplayName, Guid? eventContext)
     {
-        Console.WriteLine($"[{Describe(session)}] OnDisplayNameChanged: '{newDisplayName}' (ctx {eventContext})");
+        Console.WriteLine($"[{Describe(session)}] OnDisplayNameChanged: '{newDisplayName}' (ctx {Describe(eventContext)})");
     }
 
-    public void OnIconPathChanged(AudioSessionInfo session, string newIconPath, Guid eventContext)
+    public void OnIconPathChanged(AudioSessionInfo session, string newIconPath, Guid? eventContext)
     {
-        Console.WriteLine($"[{Describe(session)}] OnIconPathChanged: '{newIconPath}' (ctx {eventContext})");
+        Console.WriteLine($"[{Describe(session)}] OnIconPathChanged: '{newIconPath}' (ctx {Describe(eventContext)})");
     }
 
-    public void OnSimpleVolumeChanged(AudioSessionInfo session, float newVolume, bool newMute, Guid eventContext)
+    public void OnSimpleVolumeChanged(AudioSessionInfo session, float newVolume, bool newMute, Guid? eventContext)
     {
-        Console.WriteLine($"[{Describe(session)}] OnSimpleVolumeChanged: volume={newVolume:P0} mute={newMute} (ctx {eventContext})");
+        Console.WriteLine($"[{Describe(session)}] OnSimpleVolumeChanged: volume={newVolume:P0} mute={newMute} (ctx {Describe(eventContext)})");
     }
 
-    public void OnChannelVolumeChanged(AudioSessionInfo session, float[] newChannelVolumes, uint changedChannel, Guid eventContext)
+    public void OnChannelVolumeChanged(AudioSessionInfo session, float[] newChannelVolumes, uint changedChannel, Guid? eventContext)
     {
-        int count = newChannelVolumes != null ? newChannelVolumes.Length : 0;
-        string values = newChannelVolumes != null ? string.Join(", ", newChannelVolumes) : "(null)";
-        Console.WriteLine($"[{Describe(session)}] OnChannelVolumeChanged: {count} channel(s) [{values}] changed={changedChannel} (ctx {eventContext})");
+        int count = newChannelVolumes.Length;
+        string values = string.Join(", ", newChannelVolumes);
+        Console.WriteLine($"[{Describe(session)}] OnChannelVolumeChanged: {count} channel(s) [{values}] changed={changedChannel} (ctx {Describe(eventContext)})");
     }
 
-    public void OnGroupingParamChanged(AudioSessionInfo session, Guid newGroupingParam, Guid eventContext)
+    public void OnGroupingParamChanged(AudioSessionInfo session, Guid newGroupingParam, Guid? eventContext)
     {
-        Console.WriteLine($"[{Describe(session)}] OnGroupingParamChanged: group={newGroupingParam} (ctx {eventContext})");
+        Console.WriteLine($"[{Describe(session)}] OnGroupingParamChanged: group={newGroupingParam} (ctx {Describe(eventContext)})");
     }
 
     public void OnStateChanged(AudioSessionInfo session, AudioSessionState newState)
@@ -59,7 +67,7 @@ internal sealed class SessionEventsLogger : IAudioSessionEvents
         Console.WriteLine($"[{Describe(session)}] OnStateChanged: {newState}");
     }
 
-    public void OnSessionDisconnected(AudioSessionInfo session, AudioSessionDisconnectReason disconnectReason)
+    public void OnSessionDisconnected(AudioSessionBaseInfo session, AudioSessionDisconnectReason disconnectReason)
     {
         Console.WriteLine($"[{Describe(session)}] OnSessionDisconnected: {disconnectReason}");
     }

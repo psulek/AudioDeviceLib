@@ -1,0 +1,8 @@
+- name: Home
+  href: index.md
+- name: Guides
+  href: articles/
+- name: API reference
+  href: api/
+- name: GitHub
+  href: https://github.com/psulek/AudioDeviceLib

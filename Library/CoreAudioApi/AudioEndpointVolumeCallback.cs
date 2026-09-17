@@ -1,4 +1,4 @@
-/*
+﻿/*
   LICENSE
   -------
   Copyright (C) 2007-2010 Ray Molenkamp
@@ -28,10 +28,8 @@
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax).
+  The changes are summarized in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 using System;
@@ -40,48 +38,68 @@ using AudioDeviceLib.CoreAudioApi.Interfaces;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
-// This class implements the IAudioEndpointVolumeCallback interface,
-// it is implemented in this class because implementing it on AudioEndpointVolume 
-// (where the functionality is really wanted, would cause the OnNotify function 
-// to show up in the public API. 
+// Separate COM callback implementation keeps OnNotify off AudioEndpointVolume's public API.
 internal class AudioEndpointVolumeCallback : IAudioEndpointVolumeCallback
 {
-    private AudioEndpointVolume _Parent;
+    // E_POINTER. Returned when NotifyData is null - see OnNotify.
+    private const int EPointer = unchecked((int)0x80004003);
+
+    // Cache the trailing-array offset to avoid reflection on the callback thread.
+    // Use nameof so field renames remain compiler-checked.
+    private static readonly int ChannelVolumeOffset =
+        Marshal.OffsetOf<AUDIO_VOLUME_NOTIFICATION_DATA>(
+            nameof(AUDIO_VOLUME_NOTIFICATION_DATA.ChannelVolume)).ToInt32();
+
+    private readonly AudioEndpointVolume _parent;
 
     internal AudioEndpointVolumeCallback(AudioEndpointVolume parent)
     {
-        _Parent = parent;
+        _parent = parent;
     }
 
     [PreserveSig]
-    public int OnNotify(IntPtr NotifyData)
+    public int OnNotify(IntPtr notifyData)
     {
-        //Since AUDIO_VOLUME_NOTIFICATION_DATA is dynamic in length based on the
-        //number of audio channels available we cannot just call PtrToStructure 
-        //to get all data, thats why it is split up into two steps, first the static
-        //data is marshalled into the data structure, then with some IntPtr math the
-        //remaining floats are read from memory.
-        //
-        AUDIO_VOLUME_NOTIFICATION_DATA data =
-            (AUDIO_VOLUME_NOTIFICATION_DATA)Marshal.PtrToStructure(NotifyData, typeof(AUDIO_VOLUME_NOTIFICATION_DATA));
-
-        //Determine offset in structure of the first float
-        IntPtr Offset = Marshal.OffsetOf(typeof(AUDIO_VOLUME_NOTIFICATION_DATA), "ChannelVolume");
-        //Determine offset in memory of the first float
-        IntPtr FirstFloatPtr = (IntPtr)((long)NotifyData + (long)Offset);
-
-        float[] voldata = new float[data.nChannels];
-
-        //Read all floats from memory.
-        for (int i = 0; i < data.nChannels; i++)
+        // Convert marshalling and consumer exceptions to HRESULTs; none may escape into native code.
+        try
         {
-            voldata[i] = (float)Marshal.PtrToStructure(FirstFloatPtr, typeof(float));
-        }
+            // Marshal the fixed header first, then copy the variable-length channel array.
+            // Guard against null before unboxing the header.
+            if (notifyData == IntPtr.Zero)
+            {
+                return EPointer;
+            }
+            var data = Marshal.PtrToStructure<AUDIO_VOLUME_NOTIFICATION_DATA>(notifyData);
 
-        //Create combined structure and Fire Event in parent class.
-        AudioVolumeNotificationData NotificationData =
-            new AudioVolumeNotificationData(data.guidEventContext, data.bMuted, data.fMasterVolume, voldata);
-        _Parent.FireNotification(NotificationData);
-        return 0; //S_OK
+            // Address of the trailing float array. IntPtr.Add rather than arithmetic through long:
+            // from .NET 7 the (IntPtr)(long) conversion no longer throws on overflow, so on a 32-bit
+            // runtime it truncates silently (CA2020). IntPtr.Add is native-width throughout.
+            IntPtr firstFloatPtr = IntPtr.Add(notifyData, ChannelVolumeOffset);
+
+            // Cap the driver-supplied count at the cached endpoint channel count before Marshal.Copy.
+            // Native overreads can terminate the process; the cached limit requires no callback-time COM call.
+            // Truncate rather than reject so master-volume and mute notifications remain available.
+            int channelCount = (int)Math.Min(data.nChannels, (uint)_parent.Channels.Count);
+
+            float[] voldata;
+            if (channelCount > 0)
+            {
+                voldata = new float[channelCount];
+                Marshal.Copy(firstFloatPtr, voldata, 0, channelCount);
+            }
+            else
+            {
+                voldata = Array.Empty<float>();
+            }
+
+            //Create combined structure and Fire Event in parent class.
+            var notificationData = new AudioVolumeNotificationData(data.guidEventContext, data.bMuted, data.fMasterVolume, voldata);
+            _parent.FireNotification(notificationData);
+            return InteropUtils.S_OK;
+        }
+        catch (Exception ex)
+        {
+            return InteropUtils.ReportFailure(ex);
+        }
     }
 }

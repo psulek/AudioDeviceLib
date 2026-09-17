@@ -28,26 +28,14 @@
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
-    documentation comments.
-  - `RegisterAudioSessionNotification` now accepts the library's pure-C# `IAudioSessionEvents`,
-    wraps it in an `AudioSessionEventsComAdapter` and returns an `IDisposable` registration
-    token. Registrations are tracked per consumer (by reference identity), so the same consumer
-    yields the same token and the identical sink object is handed back to COM on unregister.
-  - The class now implements `IDisposable` and unregisters every outstanding sink on disposal.
-  - Added the internal `ToSessionInfo()`, which builds an immutable `AudioSessionInfo` snapshot
-    tolerant of failing HRESULTs, so callbacks never receive the live COM object.
-  - The COM string getters were funnelled through a shared `TryGetString` helper that frees the
-    native buffer and can return `null` instead of throwing.
+  The changes are summarized in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using AudioDeviceLib.CoreAudioApi.Interfaces;
+using static AudioDeviceLib.CoreAudioApi.InteropUtils;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
@@ -55,31 +43,33 @@ namespace AudioDeviceLib.CoreAudioApi;
 /// Managed wrapper over the Core Audio <c>IAudioSessionControl2</c> interface. Represents a single
 /// audio session (typically one application) and exposes its state, metadata and volume controls.
 /// </summary>
-public class AudioSessionControl : IDisposable
+public sealed class AudioSessionControl : IDisposable
 {
-    internal IAudioSessionControl2 _AudioSessionControl;
-    internal AudioMeterInformation _AudioMeterInformation;
-    internal SimpleAudioVolume _SimpleAudioVolume;
-    private const int S_OK = 0;
+    private readonly IAudioSessionControl2COM _audioSessionControl;
 
-    // Maps each registered consumer to its registration entry (the COM adapter plus the cached
-    // token). Keeping the adapter lets Unregister pass the identical sink object back to COM and
-    // keeps its CCW alive while registered; caching the token means repeated registration of the
-    // same consumer hands back the same IDisposable instead of allocating a new one each time.
+    // Retain each consumer's COM adapter for its lifetime and for matching unregistration.
+    // Reuse its token when the same consumer registers again.
     private readonly Dictionary<IAudioSessionEvents, Registration> _registrations
         = new Dictionary<IAudioSessionEvents, Registration>(AudioSessionEventsRefComparer.Instance);
 
     private readonly object _registrationsLock = new object();
-    private bool _disposed;
+    private volatile bool _disposed;
+
+    // Cache immutable session identity while the COM object is healthy.
+    // After disconnection, even identity getters can fail, so callbacks must use cached values.
+    private readonly string? _sessionIdentifier;
+    private readonly string? _sessionInstanceIdentifier;
+    private readonly uint _processId;
+    private readonly bool _isSystemSoundsSession;
 
     // Pairs the COM sink adapter with the token handed to the caller, cached together so that
     // removing the entry on dispose invalidates the cache: the next Register then creates a fresh one.
     private sealed class Registration
     {
-        internal readonly AudioSessionEventsComAdapter Adapter;
+        internal readonly AudioSessionEventsAdapter Adapter;
         internal readonly SessionEventsRegistration Token;
 
-        internal Registration(AudioSessionEventsComAdapter adapter, SessionEventsRegistration token)
+        internal Registration(AudioSessionEventsAdapter adapter, SessionEventsRegistration token)
         {
             Adapter = adapter;
             Token = token;
@@ -87,80 +77,99 @@ public class AudioSessionControl : IDisposable
     }
 
     /// <summary>Gets the peak-meter information for this session, or <c>null</c> if unsupported.</summary>
-    public AudioMeterInformation AudioMeterInformation => _AudioMeterInformation;
+    private readonly AudioMeterInformation? _audioMeterInformation;
+    /// <summary>Gets the session meter, or null if unsupported.</summary>
+    public AudioMeterInformation? AudioMeterInformation
+    {
+        get
+        {
+            ThrowIfDisposed();
+            return _audioMeterInformation;
+        }
+    }
 
     /// <summary>Gets the simple (per-session) volume and mute control, or <c>null</c> if unsupported.</summary>
-    public SimpleAudioVolume SimpleAudioVolume => _SimpleAudioVolume;
-
-    internal AudioSessionControl(IAudioSessionControl2 realAudioSessionControl)
+    private readonly SimpleAudioVolume? _simpleAudioVolume;
+    /// <summary>Gets the session volume control, or null if unsupported.</summary>
+    public SimpleAudioVolume? SimpleAudioVolume
     {
-        IAudioMeterInformation _meters = realAudioSessionControl as IAudioMeterInformation;
-        ISimpleAudioVolume _volume = realAudioSessionControl as ISimpleAudioVolume;
-        if (_meters != null)
+        get
         {
-            _AudioMeterInformation = new CoreAudioApi.AudioMeterInformation(_meters);
+            ThrowIfDisposed();
+            return _simpleAudioVolume;
+        }
+    }
+
+    internal AudioSessionControl(IAudioSessionControl2COM audioSessionControl)
+    {
+        // ReSharper disable once SuspiciousTypeConversion.Global
+        // NOTE: This cast is safe: the meters is get by doing QueryInterface for IAudioMeterInformation
+        if (audioSessionControl is IAudioMeterInformationCOM meters)
+        {
+            _audioMeterInformation = new AudioMeterInformation(meters);
         }
 
-        if (_volume != null)
+        // ReSharper disable once SuspiciousTypeConversion.Global
+        // NOTE: This cast is safe: the volumne is get by doing QueryInterface for ISimpleAudioVolume
+        if (audioSessionControl is ISimpleAudioVolumeCOM volume)
         {
-            _SimpleAudioVolume = new SimpleAudioVolume(_volume);
+            _simpleAudioVolume = new SimpleAudioVolume(volume);
         }
 
-        _AudioSessionControl = realAudioSessionControl;
+        _audioSessionControl = audioSessionControl ?? throw new ArgumentNullException(nameof(audioSessionControl));
+
+        // Leave unreadable metadata at its default so an expired session cannot abort enumeration.
+        if (HrSuccess(audioSessionControl.GetSessionIdentifier(out string sessionIdentifier)))
+        {
+            _sessionIdentifier = sessionIdentifier;
+        }
+
+        if (HrSuccess(audioSessionControl.GetSessionInstanceIdentifier(out string instanceIdentifier)))
+        {
+            _sessionInstanceIdentifier = instanceIdentifier;
+        }
+
+        // Not an S_OK comparison: a session spanning several processes returns
+        // AUDCLNT_S_NO_SINGLE_PROCESS, which is a success code that still writes a usable PID.
+        if (HrSuccess(audioSessionControl.GetProcessId(out uint processId)))
+        {
+            _processId = processId;
+        }
+
+        // Only S_OK identifies the system-sounds session; S_FALSE and failures map to false.
+        // Cache this result once while the session is healthy.
+        _isSystemSoundsSession = audioSessionControl.IsSystemSoundsSession() == S_OK;
     }
     
-    // Signature shared by the IAudioSessionControl2 getters that return a COM string pointer.
-    private delegate int GetStringPtr(out IntPtr ptr);
+    // Build snapshots from cached identity and best-effort reads of mutable metadata.
+    // Failed HRESULTs leave defaults, allowing snapshots during session teardown.
+    internal AudioSessionBaseInfo ToSessionBaseInfo() => new AudioSessionBaseInfo(
+        _processId, _sessionIdentifier ?? string.Empty, _sessionInstanceIdentifier ?? string.Empty,
+        _isSystemSoundsSession);
 
-    // Invokes one of the raw [PreserveSig] string getters and marshals its result: returns the
-    // string on S_OK (freeing the native buffer), or null when the call fails. Used for the
-    // display name, icon path and the two session identifiers, which all share this pattern.
-    private static string TryGetString(GetStringPtr getter, bool throwOnError = false)
-    {
-        var errorCode = getter(out var ptr);
-        if (errorCode == S_OK)
-        {
-            string value = Marshal.PtrToStringAuto(ptr);
-            Marshal.FreeCoTaskMem(ptr);
-            return value;
-        } 
-        
-        if (throwOnError)
-        {
-            Marshal.ThrowExceptionForHR(errorCode);
-        }
-
-        return null;
-    }
-
-    // Builds an immutable snapshot of this session by reading the raw COM interface directly.
-    // Each getter is [PreserveSig] returning an HRESULT, so instead of throwing we keep a value
-    // only when the call returns S_OK; anything that fails is left at its default. This makes the
-    // snapshot safe to build even while the session is tearing down (e.g. on disconnect).
     internal AudioSessionInfo ToSessionInfo()
     {
-        string displayName = TryGetString(_AudioSessionControl.GetDisplayName);
-        string iconPath = TryGetString(_AudioSessionControl.GetIconPath);
-        string sessionIdentifier = TryGetString(_AudioSessionControl.GetSessionIdentifier);
-        string sessionInstanceIdentifier = TryGetString(_AudioSessionControl.GetSessionInstanceIdentifier);
+        if (HrFailed(_audioSessionControl.GetDisplayName(out string displayName)))
+        {
+            displayName = string.Empty;
+        }
+        if (HrFailed(_audioSessionControl.GetIconPath(out string iconPath)))
+        {
+            iconPath = string.Empty;
+        }
 
         AudioSessionState state = default;
-        if (_AudioSessionControl.GetState(out var stateValue) == S_OK)
+        if (HrSuccess(_audioSessionControl.GetState(out var stateValue)))
         {
             state = stateValue;
         }
 
-        uint processId = 0;
-        if (_AudioSessionControl.GetProcessId(out var pid) == S_OK)
-        {
-            processId = pid;
-        }
-
-        bool isSystemSounds = _AudioSessionControl.IsSystemSoundsSession() == S_OK;
-
-        return new AudioSessionInfo(displayName, iconPath, state, processId, sessionIdentifier,
-            sessionInstanceIdentifier, isSystemSounds);
+        return new AudioSessionInfo(displayName, iconPath, state, _processId, 
+            _sessionIdentifier ?? string.Empty,
+            _sessionInstanceIdentifier ?? string.Empty,
+            _isSystemSoundsSession);
     }
+
 
     /// <summary>Registers a callback to receive session change notifications.</summary>
     /// <param name="eventConsumer">The consumer that will receive <see cref="IAudioSessionEvents"/> callbacks.</param>
@@ -180,13 +189,8 @@ public class AudioSessionControl : IDisposable
     /// </remarks>
     public IDisposable RegisterAudioSessionNotification(IAudioSessionEvents eventConsumer)
     {
-        if (eventConsumer == null)
-        {
-            throw new ArgumentNullException(nameof(eventConsumer));
-        }
+        RequireNotNull(eventConsumer, nameof(eventConsumer));
 
-        AudioSessionEventsComAdapter adapter;
-        SessionEventsRegistration token;
         lock (_registrationsLock)
         {
             ThrowIfDisposed();
@@ -197,13 +201,13 @@ public class AudioSessionControl : IDisposable
                 return existing.Token;
             }
 
-            adapter = new AudioSessionEventsComAdapter(this, eventConsumer);
-            token = new SessionEventsRegistration(this, adapter);
+            var adapter = new AudioSessionEventsAdapter(this, eventConsumer);
+            var token = new SessionEventsRegistration(this, adapter);
+            // Serialize native registration with disposal; publish only after success.
+            ThrowIfFailed(_audioSessionControl.RegisterAudioSessionNotification(adapter));
             _registrations[eventConsumer] = new Registration(adapter, token);
+            return token;
         }
-
-        Marshal.ThrowExceptionForHR(_AudioSessionControl.RegisterAudioSessionNotification(adapter));
-        return token;
     }
 
     /// <summary>Unregisters a previously registered session change callback.</summary>
@@ -213,12 +217,8 @@ public class AudioSessionControl : IDisposable
     /// <remarks>Has no effect if the instance was not previously registered on this session.</remarks>
     public void UnregisterAudioSessionNotification(IAudioSessionEvents eventConsumer)
     {
-        if (eventConsumer == null)
-        {
-            throw new ArgumentNullException(nameof(eventConsumer));
-        }
+        RequireNotNull(eventConsumer, nameof(eventConsumer));
 
-        AudioSessionEventsComAdapter adapter;
         lock (_registrationsLock)
         {
             if (!_registrations.TryGetValue(eventConsumer, out var existing))
@@ -226,22 +226,16 @@ public class AudioSessionControl : IDisposable
                 return;
             }
 
-            adapter = existing.Adapter;
+            AudioSessionEventsAdapter adapter = existing.Adapter;
+            ThrowIfFailed(_audioSessionControl.UnregisterAudioSessionNotification(adapter));
             _registrations.Remove(eventConsumer);
         }
-
-        Marshal.ThrowExceptionForHR(_AudioSessionControl.UnregisterAudioSessionNotification(adapter));
     }
 
     // Called by a registration token to undo exactly one registration. Idempotent: a no-op if the
     // adapter was already removed (e.g. by Unregister, Dispose, or a second token).
-    internal void RemoveRegistration(AudioSessionEventsComAdapter adapter)
+    internal void RemoveRegistration(AudioSessionEventsAdapter adapter)
     {
-        if (adapter == null)
-        {
-            return;
-        }
-
         lock (_registrationsLock)
         {
             if (!_registrations.TryGetValue(adapter.Target, out var existing) || !ReferenceEquals(existing.Adapter, adapter))
@@ -249,16 +243,15 @@ public class AudioSessionControl : IDisposable
                 return;
             }
 
+            ThrowIfFailed(_audioSessionControl.UnregisterAudioSessionNotification(adapter));
             _registrations.Remove(adapter.Target);
         }
-
-        Marshal.ThrowExceptionForHR(_AudioSessionControl.UnregisterAudioSessionNotification(adapter));
     }
 
     /// <summary>Unregisters any remaining session-event callbacks registered on this session.</summary>
     public void Dispose()
     {
-        List<AudioSessionEventsComAdapter> toUnregister;
+        List<AudioSessionEventsAdapter> toUnregister;
         lock (_registrationsLock)
         {
             if (_disposed)
@@ -267,7 +260,9 @@ public class AudioSessionControl : IDisposable
             }
 
             _disposed = true;
-            toUnregister = new List<AudioSessionEventsComAdapter>(_registrations.Count);
+            _audioMeterInformation?.Dispose();
+            _simpleAudioVolume?.Dispose();
+            toUnregister = new List<AudioSessionEventsAdapter>(_registrations.Count);
             foreach (Registration reg in _registrations.Values)
             {
                 toUnregister.Add(reg.Adapter);
@@ -276,14 +271,15 @@ public class AudioSessionControl : IDisposable
             _registrations.Clear();
         }
 
-        foreach (AudioSessionEventsComAdapter adapter in toUnregister)
+        foreach (AudioSessionEventsAdapter adapter in toUnregister)
         {
             try
             {
-                Marshal.ThrowExceptionForHR(_AudioSessionControl.UnregisterAudioSessionNotification(adapter));
+                ThrowIfFailed(_audioSessionControl.UnregisterAudioSessionNotification(adapter));
             }
-            catch
+            catch (Exception cleanupException)
             {
+                ReportFailure(cleanupException);
                 // best-effort cleanup
             }
         }
@@ -295,47 +291,15 @@ public class AudioSessionControl : IDisposable
     {
         get
         {
-            Marshal.ThrowExceptionForHR(_AudioSessionControl.GetState(out AudioSessionState res));
+            ThrowIfDisposed();
+            ThrowIfFailed(_audioSessionControl.GetState(out AudioSessionState res));
             return res;
         }
     }
 
-    /// <summary>Gets the display name reported by the session, if any.</summary>
-    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
-    public string DisplayName => TryGetString(_AudioSessionControl.GetDisplayName, true);
-
-    /// <summary>Gets the path of the icon reported by the session, if any.</summary>
-    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
-    public string IconPath => TryGetString(_AudioSessionControl.GetIconPath, true);
-
-    /// <summary>Gets the session identifier string, shared by all instances of the same session.</summary>
-    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
-    public string SessionIdentifier => TryGetString(_AudioSessionControl.GetSessionIdentifier, true);
-
-    /// <summary>Gets the identifier that uniquely distinguishes this session instance.</summary>
-    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
-    public string SessionInstanceIdentifier => TryGetString(_AudioSessionControl.GetSessionInstanceIdentifier, true);
-
-    /// <summary>Gets the process identifier (PID) that owns the session.</summary>
-    /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
-    public uint ProcessID
-    {
-        get
-        {
-            Marshal.ThrowExceptionForHR(_AudioSessionControl.GetProcessId(out var pid));
-            return pid;
-        }
-    }
-
-    /// <summary>Gets a value indicating whether this session is the reserved system-sounds session.</summary>
-    public bool IsSystemIsSystemSoundsSession => (_AudioSessionControl.IsSystemSoundsSession() == 0); //S_OK
-
-    // Callers hold _registrationsLock; the flag is only ever written under it.
+    // Volatile reads also guard live public getters outside the registration lock.
     private void ThrowIfDisposed()
     {
-        if (_disposed)
-        {
-            throw new ObjectDisposedException(nameof(AudioSessionControl));
-        }
+        RequireNotDisposed(_disposed, this);
     }
 }

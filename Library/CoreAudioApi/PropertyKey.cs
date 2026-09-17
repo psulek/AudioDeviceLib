@@ -28,13 +28,8 @@
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
-    documentation comments.
-  - Added a `Name` property that resolves the key's `fmtid`/`pid` to a friendly, human-readable
-    name via `PropertyKeyNames`.
+  The changes are summarized in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 using System;
@@ -42,17 +37,15 @@ using System;
 namespace AudioDeviceLib.CoreAudioApi;
 
 /// <summary>Identifies a single property in a Core Audio property store (the native <c>PROPERTYKEY</c>).</summary>
-public struct PropertyKey
+[System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+public readonly record struct PropertyKey
 {
-    /// <summary>The format identifier (GUID) of the property set the property belongs to.</summary>
-    public Guid fmtid;
+    /// <summary>Gets the property-set format identifier.</summary>
+    public Guid FormatId { get; init; }
 
-    /// <summary>The property identifier within the property set identified by <see cref="fmtid"/>.</summary>
-    public int pid;
+    /// <summary>Gets the identifier within the property set.</summary>
+    public int PropertyId { get; init; }
 
-    /// <summary>
-    /// A friendly, human-readable name for well-known audio property keys (e.g.
-    /// <c>Device.FriendlyName</c>), or a <c>"{fmtid}/{pid}"</c> fallback when the key is not recognized.
-    /// </summary>
-    public readonly string Name => PropertyKeyNames.GetName(this);
-};
+    /// <summary>Gets the friendly name or the native key identity.</summary>
+    public string Name => PropertyKeyNames.GetName(this);
+}

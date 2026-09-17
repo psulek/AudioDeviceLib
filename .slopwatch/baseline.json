@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "createdAt": "2026-09-21T06:29:08.9722529+00:00",
+  "updatedAt": "2026-09-21T06:29:08.9750839+00:00",
+  "description": "Initial baseline created by 'slopwatch init' on 2026-09-21 06:29:08 UTC",
+  "entries": [
+    {
+      "hash": "6fdfc89282637545",
+      "ruleId": "SW003",
+      "filePath": "Library/Lib/AudioController.cs",
+      "lineNumber": 345,
+      "codeSnippet": "catch\r\n                {\r\n                    // Swallow any disposal failures: the caller never received the list, so nothing else can clean up these wrappers.\r\n                    // The underlying COM objects are still alive and will be released when the enumerator is released.\r\n                }",
+      "message": "Empty catch block swallows exceptions without handling",
+      "baselinedAt": "2026-09-21T06:29:08.9749684+00:00"
+    },
+    {
+      "hash": "592526d7dfea0c5a",
+      "ruleId": "SW004",
+      "filePath": "Library.UnitTests/ControllerDisposeRaceTests.cs",
+      "lineNumber": 227,
+      "codeSnippet": "SpinWait.SpinUntil(() => Volatile.Read(ref laps) >= Readers * 2, TimeSpan.FromSeconds(10))",
+      "message": "Test uses SpinWait which may indicate a timing-dependent test",
+      "baselinedAt": "2026-09-21T06:29:08.9750525+00:00"
+    },
+    {
+      "hash": "03f786c78d221af1",
+      "ruleId": "SW003",
+      "filePath": "Library.UnitTests/DeviceActivationRaceTests.cs",
+      "lineNumber": 172,
+      "codeSnippet": "catch (ObjectDisposedException)\r\n                    {\r\n                        // Expected: this reader lost the race with Dispose.\r\n                    }",
+      "message": "Empty catch block swallows exceptions without handling",
+      "baselinedAt": "2026-09-21T06:29:08.9750588+00:00"
+    },
+    {
+      "hash": "fb9e494cec6efa33",
+      "ruleId": "SW005",
+      "filePath": "temp/ChannelProbe/ChannelProbe.csproj",
+      "lineNumber": 6,
+      "codeSnippet": "<Nullable>disable</Nullable>",
+      "message": "Nullable reference types are disabled",
+      "baselinedAt": "2026-09-21T06:29:08.9750634+00:00"
+    },
+    {
+      "hash": "1a3893c0c58905fe",
+      "ruleId": "SW003",
+      "filePath": "temp/ChannelProbe/Program.cs",
+      "lineNumber": 726,
+      "codeSnippet": "catch\r\n            {\r\n                // never let anything escape into native code\r\n            }",
+      "message": "Empty catch block swallows exceptions without handling",
+      "baselinedAt": "2026-09-21T06:29:08.97507+00:00"
+    },
+    {
+      "hash": "5e8afbe5ed2869de",
+      "ruleId": "SW005",
+      "filePath": "temp/clsidprobe/nscheck/nscheck.csproj",
+      "lineNumber": 4,
+      "codeSnippet": "<Nullable>disable</Nullable>",
+      "message": "Nullable reference types are disabled",
+      "baselinedAt": "2026-09-21T06:29:08.9750727+00:00"
+    },
+    {
+      "hash": "ec7b94e8f1007e1e",
+      "ruleId": "SW005",
+      "filePath": "temp/clsidprobe/probe/probe.csproj",
+      "lineNumber": 5,
+      "codeSnippet": "<Nullable>disable</Nullable>",
+      "message": "Nullable reference types are disabled",
+      "baselinedAt": "2026-09-21T06:29:08.975075+00:00"
+    },
+    {
+      "hash": "5732a7603b63336b",
+      "ruleId": "SW005",
+      "filePath": "temp/clsidprobe/rival/rival.csproj",
+      "lineNumber": 4,
+      "codeSnippet": "<Nullable>disable</Nullable>",
+      "message": "Nullable reference types are disabled",
+      "baselinedAt": "2026-09-21T06:29:08.9750776+00:00"
+    },
+    {
+      "hash": "81e8643e1a6e13c0",
+      "ruleId": "SW005",
+      "filePath": "temp/libcheck/libcheck.csproj",
+      "lineNumber": 5,
+      "codeSnippet": "<Nullable>disable</Nullable>",
+      "message": "Nullable reference types are disabled",
+      "baselinedAt": "2026-09-21T06:29:08.975081+00:00"
+    },
+    {
+      "hash": "076a074a39374f14",
+      "ruleId": "SW003",
+      "filePath": "temp/sessionprobe/Program.cs",
+      "lineNumber": 450,
+      "codeSnippet": "catch { }",
+      "message": "Empty catch block swallows exceptions without handling",
+      "baselinedAt": "2026-09-21T06:29:08.9750838+00:00"
+    }
+  ]
+}

@@ -4,9 +4,17 @@
     <TargetFrameworks>net48;netstandard2.0;net8.0-windows</TargetFrameworks>
 
     <ImplicitUsings>disable</ImplicitUsings>
-    <Nullable>disable</Nullable>
+    <Nullable>enable</Nullable>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
 
     <EnableComHosting>false</EnableComHosting>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest</AnalysisLevel>
+    <AnalysisMode>Recommended</AnalysisMode>
+    <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <IsAotCompatible>false</IsAotCompatible>
+    <IsTrimmable>false</IsTrimmable>
 
     <RootNamespace>AudioDeviceLib</RootNamespace>
     <AssemblyName>AudioDeviceLib</AssemblyName>
@@ -16,7 +24,6 @@
       Targets .NET Framework 4.8, .NET Standard 2.0 and .NET 8 (Windows).
       Core Audio interop derived from AudioDeviceCmdlets (frgnca) / CoreAudioApi (Ray Molenkamp).
     </Description>
-    <Version>1.0.0-rc.3</Version>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
 
@@ -29,6 +36,7 @@
     <IncludeSymbols>true</IncludeSymbols>
     <SymbolPackageFormat>snupkg</SymbolPackageFormat>
     <ContinuousIntegrationBuild Condition="'$(GITHUB_ACTIONS)' == 'true'">true</ContinuousIntegrationBuild>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
   <!-- Ship the repo-root README on the nuget.org package page (it lives one level up), and the
@@ -37,15 +45,24 @@
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\" />
     <None Include="..\THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="\" />
+    <None Include="..\MODIFICATIONS.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <!-- Build-time-only: lets the .NET SDK compile the net48 target without a machine-wide
        .NET Framework Developer Pack. No runtime dependency (PrivateAssets=all). -->
   <ItemGroup Condition="'$(TargetFrameworkIdentifier)' == '.NETFramework'">
-    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" PrivateAssets="all" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="JetBrains.Annotations" Version="2026.2.0" PrivateAssets="all" />
+    <PackageReference Include="JetBrains.Annotations" PrivateAssets="all" />
+    <PackageReference Include="PolySharp">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="AudioDeviceLib.UnitTests" />
   </ItemGroup>
 
 </Project>

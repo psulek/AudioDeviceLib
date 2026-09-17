@@ -11,7 +11,7 @@
 
 using System;
 
-namespace AudioDeviceLib.Lib;
+namespace AudioDeviceLib;
 
 /// <summary>Direction of an audio endpoint.</summary>
 public enum AudioDeviceKind
@@ -33,13 +33,13 @@ public enum AudioDeviceKind
 [Flags]
 public enum DefaultRole
 {
-    /// <summary>Console role (system sounds, games, voice commands) — maps to <c>Role.Console</c>.</summary>
+    /// <summary>Console role (system sounds, games, voice commands) - maps to <c>Role.Console</c>.</summary>
     Console = 1,
 
-    /// <summary>Multimedia role (music, movies) — maps to <c>Role.Multimedia</c>. Matches <c>-DefaultOnly</c>.</summary>
+    /// <summary>Multimedia role (music, movies) - maps to <c>Role.Multimedia</c>. Matches <c>-DefaultOnly</c>.</summary>
     Multimedia = 2,
 
-    /// <summary>Communications role (voice chat) — maps to <c>Role.Communications</c>. Matches <c>-CommunicationOnly</c>.</summary>
+    /// <summary>Communications role (voice chat) - maps to <c>Role.Communications</c>. Matches <c>-CommunicationOnly</c>.</summary>
     Communications = 4,
 
     /// <summary>

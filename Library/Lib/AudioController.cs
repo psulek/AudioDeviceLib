@@ -1,4 +1,4 @@
-/*
+﻿/*
   LICENSE
   -------
   Copyright (C) 2007-2010 Ray Molenkamp
@@ -23,19 +23,14 @@
 /*
   MODIFICATIONS
   -------------
-  The `_MMDeviceEnumerator` coclass and the endpoint-enumeration helpers in this file are an ALTERED
-  version of the original `MMDeviceEnumerator` source by Ray Molenkamp and must not be
-  misrepresented as being the original source code. Altered by Peter Šulek for AudioDeviceLib
+  The endpoint-enumeration helpers in this file are an ALTERED version of the original
+  `MMDeviceEnumerator` source by Ray Molenkamp and must not be misrepresented as being the
+  original source code. Altered by Peter Šulek for AudioDeviceLib
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
 
-  Changes from the original:
-  - The `MMDeviceEnumerator` wrapper class was folded into `AudioController` as private helpers;
-    `CoreAudioApi/MMDeviceEnumerator.cs` no longer exists.
-  - The helpers return the raw `IMMDevice` rather than a wrapper, leaving `AudioController` as the
-    only place that constructs an `AudioDevice`.
-  - The `IMMDeviceEnumerator` is created lazily, so paths that never enumerate (for example setting
-    a default by ID, which only needs `IPolicyConfig`) no longer CoCreate one.
+  The changes are summarized in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 /*
@@ -55,11 +50,13 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Threading;
 using AudioDeviceLib.CoreAudioApi;
 using AudioDeviceLib.CoreAudioApi.Interfaces;
 using JetBrains.Annotations;
+using static AudioDeviceLib.CoreAudioApi.InteropUtils;
 
-namespace AudioDeviceLib.Lib;
+namespace AudioDeviceLib;
 
 /// <summary>
 /// High-level API over the Windows Core Audio endpoints. Create one instance and reuse it.
@@ -68,54 +65,67 @@ namespace AudioDeviceLib.Lib;
 [PublicAPI]
 public sealed class AudioController : IDisposable
 {
-    private class DeviceDefaultIds
-    {
-        public string DefaultPlaybackId;
-        public string DefaultRecordingId;
-        public string CommPlaybackId;
-        public string CommRecordingId;
+    private const string EnumeratorUnsupportedMessage =
+        "Core Audio is not available on this system: the MMDeviceEnumerator COM class (CLSID " +
+        "bcde0395-e52f-467c-8e3d-c4579291692e) does not expose IMMDeviceEnumerator. This interface " +
+        "has been part of Windows since Vista, so this usually indicates a damaged or heavily " +
+        "customised audio stack rather than an unsupported Windows version.";
 
-        // Takes the ID rather than the device: AudioDevice snapshots its ID at construction, so
-        // comparing strings here avoids two IMMDevice::GetId round trips per device.
-        public bool IsDefault(string deviceId)
-        {
-            return deviceId == DefaultPlaybackId || deviceId == DefaultRecordingId;
-        }
+    private const string EnumeratorNotRegisteredMessage =
+        "Core Audio is not available on this system: the MMDeviceEnumerator COM class (CLSID " +
+        "bcde0395-e52f-467c-8e3d-c4579291692e) is not registered. This class has been part of " +
+        "Windows since Vista, so this usually indicates a damaged audio stack or a Windows " +
+        "installation with the audio components stripped out.";
 
-        public bool IsDefaultComm(string deviceId)
-        {
-            return deviceId == CommPlaybackId || deviceId == CommRecordingId;
-        }
-    }
+    private const string EnumeratorNotInitializedMessage =
+        "COM has not been initialised on this thread, so the MMDeviceEnumerator COM class (CLSID " +
+        "bcde0395-e52f-467c-8e3d-c4579291692e) could not be activated. Call CoInitializeEx, or run " +
+        "on a thread marked [STAThread] or [MTAThread], before using AudioController.";
 
-    // Created on first use. Setting a default by ID goes through IPolicyConfig only and never needs
-    // an enumerator, so eager creation made that path pay for a CoCreateInstance it did not use.
-    private IMMDeviceEnumerator _realEnumerator;
+    private const string EnumeratorActivationFailedFormat =
+        "Core Audio is not available on this system: activating the MMDeviceEnumerator COM class " +
+        "(CLSID bcde0395-e52f-467c-8e3d-c4579291692e) failed with HRESULT {0}. The inner exception " +
+        "carries the underlying COM failure.";
 
-    // Maps each registered consumer to its registration entry (the COM adapter plus the cached
-    // token). Holding the adapter keeps its CCW alive while registered (a GC'd sink would stop
-    // notifications); caching the token means repeated registration of the same consumer hands back
-    // the same IDisposable instead of allocating a new one each time.
+    private IMMDeviceEnumeratorCOM? _deviceEnumerator;
+
+    // Lazily created to avoid failing when policy-config COM is unavailable, then cached for subsequent SetDefaultDevice calls.
+    private PolicyConfigClient? _policyClient;
+    
+    // Maps each consumer to its registration, keeping the COM adapter alive and reusing the cached IDisposable token across repeated registrations.
     private readonly Dictionary<IAudioDeviceEvents, DeviceRegistration> _deviceRegistrations
         = new Dictionary<IAudioDeviceEvents, DeviceRegistration>(AudioDeviceEventsRefComparer.Instance);
 
+    private readonly object _notificationLock = new object();
     private readonly object _deviceRegistrationsLock = new object();
-    private bool _disposed;
 
-    // Pairs the COM sink adapter with the token handed to the caller, cached together so that
-    // removing the entry on disposal invalidates the cache: the next Register then creates a fresh one.
-    private sealed class DeviceRegistration
+    // Volatile ensures disposal is visible to lock-free reads in ThrowIfDisposed while writes remain protected by _deviceRegistrationsLock.
+    private volatile bool _disposed;
+
+    // Tracks active enumerator operations so Dispose can wait for them to complete before releasing the RCW.
+    private int _activeOperations;
+    
+    // Maximum time Dispose waits for active operations to complete before giving up on deterministic enumerator release.
+    private static readonly TimeSpan DisposeDrainTimeout = TimeSpan.FromSeconds(5);
+
+    // CLSID_MMDeviceEnumerator and IID_IMMDeviceEnumerator.
+    private static readonly Guid MMDeviceEnumeratorClsid = new Guid("BCDE0395-E52F-467C-8E3D-C4579291692E");
+    private static readonly Guid MMDeviceEnumeratorIid = new Guid("A95664D2-9614-4F35-A746-DE8DB63617E6");
+
+    /// <summary>Creates a controller over the machine's Core Audio endpoints.</summary>
+    /// <exception cref="PlatformNotSupportedException">Thrown when not running on Windows.</exception>
+    public AudioController()
     {
-        internal readonly MMNotificationClientComAdapter Adapter;
-        internal readonly DeviceEventsRegistration Token;
-
-        internal DeviceRegistration(MMNotificationClientComAdapter adapter, DeviceEventsRegistration token)
-        {
-            Adapter = adapter;
-            Token = token;
-        }
+        // Checked here rather than lazily on first use: "this library does not run on this OS" is a
+        // property of the process, not of whichever call happens to touch COM first.
+        PlatformSupport.ThrowIfUnsupported();
     }
 
+    private static bool SameEndpointId(string? id1, string? id2)
+    {
+        return id1 != null && id2 != null && string.Equals(id1, id2, StringComparison.OrdinalIgnoreCase);
+    }
+    
     /// <summary>Returns the endpoints matching the given data-flow direction and state, in enumeration order.</summary>
     /// <param name="flow">
     /// Which endpoint directions to include: <see cref="DataFlowFilter.Render"/> (playback),
@@ -128,40 +138,57 @@ public sealed class AudioController : IDisposable
     /// <returns>
     /// A read-only list of the matching <see cref="AudioDevice"/> endpoints. The list is empty if no endpoints match.
     /// </returns>
+    /// <remarks>
+    /// The caller owns the returned endpoints and should dispose of them. An endpoint that becomes
+    /// unreadable while the list is being built - unplugged, or its driver torn down - is omitted
+    /// rather than failing the whole call, so the result can be shorter than the number of endpoints
+    /// the system reported.
+    /// </remarks>
     /// <exception cref="ObjectDisposedException">Thrown when this controller has been disposed.</exception>
     public IReadOnlyList<AudioDevice> GetDevices(DataFlowFilter flow = DataFlowFilter.All,
         DeviceStateFilter state = DeviceStateFilter.Active)
     {
         return GetDevicesInternal(flow, state);
     }
-    
+
     /// <summary>
-    /// Returns the immutable <see cref="AudioDeviceInfo"/> snapshot of the given endpoint's identifying data.
+    /// Returns the immutable <see cref="AudioDeviceInfo"/> snapshot of the given endpoint's identifying data,
+    /// or <c>null</c> if no endpoint with that ID is present on the system.
     /// </summary>
     /// <param name="deviceId"> The ID of the endpoint to retrieve information for. </param>
     /// <returns>
-    /// A snapshot carrying this device's information, safe to keep after this <see cref="AudioDevice"/> is disposed of.
+    /// A snapshot carrying this device's information, safe to keep after this <see cref="AudioDevice"/> is disposed of,
+    /// or <c>null</c> if the ID matches no endpoint currently on the system. See
+    /// <see cref="GetDeviceById"/> for why absence is an answer rather than an error.
     /// </returns>
     /// <exception cref="ArgumentNullException">If <paramref name="deviceId"/> is null or empty.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="deviceId"/> is not a well-formed endpoint ID.</exception>
-    /// <exception cref="COMException">Thrown when the ID is well-formed but no such endpoint exists.</exception>
+    /// <exception cref="COMException">Thrown when the endpoint exists but could not be read.</exception>
     /// <exception cref="ObjectDisposedException">Thrown when this controller has been disposed.</exception>
-    public AudioDeviceInfo GetDeviceInfo(string deviceId)
+    public AudioDeviceInfo? GetDeviceInfo(string deviceId)
     {
-        using AudioDevice device = GetDeviceById(deviceId);
+        using var device = GetDeviceById(deviceId);
         return device?.ToDeviceInfo();
     }
 
     /// <summary>
-    /// Returns the endpoint with the given ID.
+    /// Returns the endpoint with the given ID, or <c>null</c> if no such endpoint is present on the system.
     /// </summary>
     /// <param name="deviceId"> The ID of the endpoint to return. </param>
-    /// <returns> The endpoint with the given ID. </returns>
+    /// <returns>
+    /// The endpoint with the given ID, or <c>null</c> if the ID matches no endpoint currently on the
+    /// system. An ID obtained from <see cref="GetDevices"/> can stop resolving at any time - the
+    /// endpoint may be unplugged or disabled between the two calls - so a null result is an expected
+    /// outcome of that race, not a failure. Anything that is genuinely wrong still throws.
+    /// </returns>
     /// <exception cref="ArgumentNullException"> If <paramref name="deviceId"/> is null or empty. </exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="deviceId"/> is not a well-formed endpoint ID.</exception>
-    /// <exception cref="COMException">Thrown when the ID is well-formed but no such endpoint exists.</exception>
+    /// <exception cref="COMException">Thrown when the endpoint exists but could not be read - for
+    /// example when the audio service is stopping. Only Core Audio's
+    /// <c>HRESULT_FROM_WIN32(ERROR_NOT_FOUND)</c> (0x80070490) becomes a null result; every other
+    /// HRESULT is reported.</exception>
     /// <exception cref="ObjectDisposedException">Thrown when this controller has been disposed.</exception>
-    public AudioDevice GetDeviceById(string deviceId)
+    public AudioDevice? GetDeviceById(string deviceId)
     {
         if (string.IsNullOrEmpty(deviceId))
         {
@@ -170,46 +197,102 @@ public sealed class AudioController : IDisposable
 
         ThrowIfDisposed();
 
-        var device = new AudioDevice(GetEndpoint(deviceId), false, false);
+        IMMDeviceCOM endpoint;
+        try
+        {
+            endpoint = GetEndpoint(deviceId);
+        }
+        catch (Exception ex) when (IsEndpointNotFound(ex))
+        {
+            // The endpoint may have been unplugged or disabled since enumeration, so treat a missing device as unavailable.
+            return null;
+        }
 
-        // Resolved first so only this endpoint's own direction needs a default lookup: scoping to
-        // the device's flow halves the work against asking for both directions up front.
-        DeviceDefaultIds defaults = GetDeviceDefaults(
-            device.Kind == AudioDeviceKind.Recording ? DataFlowFilter.Capture : DataFlowFilter.Render);
+        var device = new AudioDevice(endpoint, false, false);
+        try
+        {
+            // Resolved first so only this endpoint's own direction needs a default lookup: scoping to
+            // the device's flow halves the work against asking for both directions up front.
+            var defaults = GetDeviceDefaults(
+                device.Kind == AudioDeviceKind.Recording ? DataFlowFilter.Capture : DataFlowFilter.Render);
 
-        device.IsDefault = defaults.IsDefault(device.Id);
-        device.IsDefaultCommunication = defaults.IsDefaultComm(device.Id);
-        return device;
+            device.IsDefault = defaults.IsDefault(device.Id);
+            device.IsDefaultCommunication = defaults.IsDefaultComm(device.Id);
+            return device;
+        }
+        catch (Exception cleanupException)
+        {
+            ReportFailure(cleanupException);
+            // The endpoint exists but initialization failed, so dispose it before propagating the failure.
+            device.Dispose();
+            throw;
+        }
     }
 
     private DeviceDefaultIds GetDeviceDefaults(DataFlowFilter flow)
     {
+        using var lease = AcquireEnumerator();
         var allowRender = flow == DataFlowFilter.Render || flow == DataFlowFilter.All;
         var allowCapture = flow == DataFlowFilter.Capture || flow == DataFlowFilter.All;
         return new DeviceDefaultIds
         {
-            DefaultPlaybackId = allowRender ? TryGetDefaultId(DataFlow.Render, Role.Multimedia) : null,
-            DefaultRecordingId = allowCapture ? TryGetDefaultId(DataFlow.Capture, Role.Multimedia) : null,
-            CommPlaybackId = allowRender ? TryGetDefaultId(DataFlow.Render, Role.Communications) : null,
-            CommRecordingId = allowCapture ? TryGetDefaultId(DataFlow.Capture, Role.Communications) : null,
+            DefaultPlaybackId = allowRender ? TryGetDefaultId(lease.Enumerator, DataFlow.Render, Role.Multimedia) : null,
+            DefaultRecordingId = allowCapture ? TryGetDefaultId(lease.Enumerator, DataFlow.Capture, Role.Multimedia) : null,
+            CommPlaybackId = allowRender ? TryGetDefaultId(lease.Enumerator, DataFlow.Render, Role.Communications) : null,
+            CommRecordingId = allowCapture ? TryGetDefaultId(lease.Enumerator, DataFlow.Capture, Role.Communications) : null,
         };
     }
 
-    private IReadOnlyList<AudioDevice> GetDevicesInternal(DataFlowFilter flow, DeviceStateFilter state)
+    private List<AudioDevice> GetDevicesInternal(DataFlowFilter flow, DeviceStateFilter state)
     {
         ThrowIfDisposed();
 
-        DeviceDefaultIds deviceDefaults = GetDeviceDefaults(flow);
+        var deviceDefaults = GetDeviceDefaults(flow);
 
-        using MMDeviceCollection devices = EnumerateEndpoints(flow, state);
-        int count = devices.Count;
+        using var devices = EnumerateEndpoints(flow, state);
+        var count = devices.Count;
         var result = new List<AudioDevice>(count);
-        for (var i = 0; i < count; i++)
+        try
         {
-            AudioDevice device = devices[i];
-            device.IsDefault = deviceDefaults.IsDefault(device.Id);
-            device.IsDefaultCommunication = deviceDefaults.IsDefaultComm(device.Id);
-            result.Add(device);
+            for (var i = 0; i < count; i++)
+            {
+                AudioDevice device;
+                try
+                {
+                    device = devices[i];
+                }
+                catch (Exception ex) when (IsTransientEndpointFailure(ex))
+                {
+                    // and device can be unplugged or otherwise become unreadable between the time the enumerator reports it and
+                    // the time the AudioDevice constructor tries to read its properties. Skip it rather than failing the whole call.
+                    continue;
+                }
+
+                device.IsDefault = deviceDefaults.IsDefault(device.Id);
+                device.IsDefaultCommunication = deviceDefaults.IsDefaultComm(device.Id);
+                result.Add(device);
+            }
+        }
+        catch (Exception cleanupException)
+        {
+            ReportFailure(cleanupException);
+            
+            // Anything not recognized above is not a per-endpoint problem, so the list never
+            // reaches the caller and the wrappers built so far are ours to clean up.
+            foreach (var device in result)
+            {
+                try
+                {
+                    device.Dispose();
+                }
+                catch
+                {
+                    // Swallow any disposal failures: the caller never received the list, so nothing else can clean up these wrappers.
+                    // The underlying COM objects are still alive and will be released when the enumerator is released.
+                }
+            }
+
+            throw;
         }
 
         return result;
@@ -250,7 +333,7 @@ public sealed class AudioController : IDisposable
     /// The default playback <see cref="AudioDevice"/> for the requested role, or <c>null</c> if no
     /// default playback device is currently set.
     /// </returns>
-    public AudioDevice GetDefaultPlaybackDevice(bool communications = false)
+    public AudioDevice? GetDefaultPlaybackDevice(bool communications = false)
     {
         return GetDefault(DataFlow.Render, communications);
     }
@@ -264,7 +347,7 @@ public sealed class AudioController : IDisposable
     /// The default recording <see cref="AudioDevice"/> for the requested role, or <c>null</c> if no
     /// default recording device is currently set.
     /// </returns>
-    public AudioDevice GetDefaultRecordingDevice(bool communications = false)
+    public AudioDevice? GetDefaultRecordingDevice(bool communications = false)
     {
         return GetDefault(DataFlow.Capture, communications);
     }
@@ -278,12 +361,15 @@ public sealed class AudioController : IDisposable
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="device"/> is <c>null</c>.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="roles"/> specifies no role.</exception>
     /// <exception cref="ObjectDisposedException">Thrown when this controller has been disposed.</exception>
+    /// <exception cref="NotSupportedException">Thrown when this system does not expose the undocumented
+    /// policy-config API that changing the default endpoint requires.</exception>
+    /// <remarks>Roles are applied sequentially (console, multimedia, communications). If a later
+    /// assignment fails, earlier assignments remain in effect; no rollback is attempted. The cached
+    /// endpoint ID can be used after its wrapper is disposed and across controllers. Windows validates
+    /// whether that ID still exists when applying each role.</remarks>
     public void SetDefaultDevice(AudioDevice device, DefaultRole roles = DefaultRole.Default)
     {
-        if (device == null)
-        {
-            throw new ArgumentNullException(nameof(device));
-        }
+        RequireNotNull(device, nameof(device));
 
         ThrowIfDisposed();
         SetDefaultDeviceById(device.Id, roles);
@@ -301,6 +387,9 @@ public sealed class AudioController : IDisposable
     /// </param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="deviceId"/> is <c>null</c> or empty.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="roles"/> specifies no role.</exception>
+    /// <exception cref="NotSupportedException">Thrown when this system does not expose the undocumented
+    /// policy-config API that changing the default endpoint requires. Thrown before any role is
+    /// applied. Later failures can leave earlier role assignments in effect.</exception>
     private void SetDefaultDeviceById(string deviceId, DefaultRole roles = DefaultRole.Default)
     {
         if (string.IsNullOrEmpty(deviceId))
@@ -314,37 +403,70 @@ public sealed class AudioController : IDisposable
                 nameof(roles));
         }
 
-        var client = new PolicyConfigClient();
-        if ((roles & DefaultRole.Console) != 0)
+        var client = AcquirePolicyClient();
+        try
         {
-            client.SetDefaultEndpoint(deviceId, Role.Console);
-        }
+            if ((roles & DefaultRole.Console) != 0)
+            {
+                client.SetDefaultEndpoint(deviceId, Role.Console);
+            }
 
-        if ((roles & DefaultRole.Multimedia) != 0)
-        {
-            client.SetDefaultEndpoint(deviceId, Role.Multimedia);
-        }
+            if ((roles & DefaultRole.Multimedia) != 0)
+            {
+                client.SetDefaultEndpoint(deviceId, Role.Multimedia);
+            }
 
-        if ((roles & DefaultRole.Communications) != 0)
+            if ((roles & DefaultRole.Communications) != 0)
+            {
+                client.SetDefaultEndpoint(deviceId, Role.Communications);
+            }
+        }
+        finally
         {
-            client.SetDefaultEndpoint(deviceId, Role.Communications);
+            ReleaseOperation();
         }
     }
 
-    private AudioDevice GetDefault(DataFlow flow, bool communications)
+    // Returns the cached policy client and marks the operation active to prevent disposal during use.
+    // Client activation occurs under the lock before incrementing the operation count, so failed
+    // activation requires no operation cleanup.
+    private PolicyConfigClient AcquirePolicyClient()
+    {
+        lock (_deviceRegistrationsLock)
+        {
+            ThrowIfDisposed();
+            _policyClient ??= new PolicyConfigClient();
+            _activeOperations++;
+            return _policyClient;
+        }
+    }
+
+    private AudioDevice? GetDefault(DataFlow flow, bool communications)
     {
         ThrowIfDisposed();
 
         var role = communications ? Role.Communications : Role.Multimedia;
+
+        // Keep lookup separate because only endpoint-not-found should mean "no default device".
+        IMMDeviceCOM endpoint;
+        try
+        {
+            endpoint = GetDefaultEndpoint(flow, role);
+        }
+        catch (Exception ex) when (IsEndpointNotFound(ex))
+        {
+            // No endpoint is assigned to this flow/role.
+            return null;
+        }
+
         AudioDevice device;
         try
         {
-            // A COMException here is how Core Audio reports "no default endpoint for this
-            // flow/role"; GetDefaultEndpoint never returns null.
-            device = new AudioDevice(GetDefaultEndpoint(flow, role), false, false);
+            device = new AudioDevice(endpoint, false, false);
         }
-        catch
+        catch (Exception ex) when (IsTransientEndpointFailure(ex))
         {
+            // The default endpoint became unavailable before it could be initialized.
             return null;
         }
 
@@ -357,80 +479,155 @@ public sealed class AudioController : IDisposable
 
             // The endpoint was resolved by `role`, so it is that role's default by construction;
             // only the other role needs comparing.
-            bool isOtherRoleDefault = device.Id == otherId;
-            device.IsDefault = communications ? isOtherRoleDefault : true;
-            device.IsDefaultCommunication = communications ? true : isOtherRoleDefault;
+            var isOtherRoleDefault = SameEndpointId(device.Id, otherId);
+            device.IsDefault = !communications || isOtherRoleDefault;
+            device.IsDefaultCommunication = communications || isOtherRoleDefault;
             return device;
         }
-        catch
+        catch (Exception cleanupException)
         {
+            ReportFailure(cleanupException);
             device.Dispose();
             throw;
         }
     }
 
-    private string TryGetDefaultId(DataFlow flow, Role role)
+    private string? TryGetDefaultId(DataFlow flow, Role role)
     {
-        IMMDevice endpoint = null;
+        using var lease = AcquireEnumerator();
+        return TryGetDefaultId(lease.Enumerator, flow, role);
+    }
+
+    private static string? TryGetDefaultId(IMMDeviceEnumeratorCOM enumerator, DataFlow flow, Role role)
+    {
+        // Keep lookup separate because only endpoint-not-found should mean "no default device".
+        IMMDeviceCOM endpoint;
         try
         {
-            endpoint = GetDefaultEndpoint(flow, role);
-            Marshal.ThrowExceptionForHR(endpoint.GetId(out var id));
+            ThrowIfFailed(enumerator.GetDefaultAudioEndpoint(flow, role, out endpoint));
+        }
+        catch (Exception ex) when (IsEndpointNotFound(ex))
+        {
+            // No endpoint exists for this flow/role.
+            return null;
+        }
+
+        try
+        {
+            ThrowIfFailed(endpoint.GetId(out var id));
             return id;
         }
-        catch
+        catch (Exception ex) when (IsTransientEndpointFailure(ex))
         {
-            // No default endpoint of this kind/role is set.
+            // The endpoint became unavailable before its ID could be read.
             return null;
         }
         finally
         {
-            // This endpoint exists only to carry an ID out; nothing else ever sees it, so releasing
-            // it here is safe and keeps four of these per enumeration off the finalizer queue.
+            // Release the temporary endpoint used only to read its ID.
             ReleaseComObject(endpoint);
         }
     }
 
-    private IMMDeviceEnumerator Enumerator
+    // E_NOTFOUND: Core Audio uses this when no endpoint exists for a flow/role or device ID.
+    internal const int HresultNotFound = unchecked((int)0x80070490);
+
+    // Internal to allow testing the error classification without requiring specific failing hardware.
+    internal static bool IsEndpointNotFound(Exception ex)
     {
-        get
+        return ex is COMException { ErrorCode: HresultNotFound };
+    }
+
+    // Identifies endpoint-specific failures that may occur when a device becomes unavailable mid-operation.
+    // Excludes ObjectDisposedException and other failures that indicate controller state or programming errors.
+    // Internal to allow direct testing without requiring failing hardware.
+    internal static bool IsTransientEndpointFailure(Exception ex)
+    {
+        return !(ex is ObjectDisposedException) &&
+               ex is COMException or InvalidOperationException;
+    }
+
+    // Lazily creates the enumerator under the lock to prevent recreation after disposal.
+    private IMMDeviceEnumeratorCOM EnumeratorCore => _deviceEnumerator ??= CreateEnumerator();
+    
+    // Activates MMDeviceEnumerator directly by IID, avoiding coclass casts that can fail when another library created the singleton RCW first.
+    // Direct activation also preserves the HRESULT for error reporting.
+    private static IMMDeviceEnumeratorCOM CreateEnumerator()
+    {
+        var clsid = MMDeviceEnumeratorClsid;
+        var iid = MMDeviceEnumeratorIid;
+
+        var hr = CoCreateInstance(ref clsid, IntPtr.Zero, CLSCTX_ALL, ref iid, out var instance);
+
+        if (HrSuccess(hr) && instance is IMMDeviceEnumeratorCOM enumerator)
         {
-            if (_realEnumerator == null)
-            {
-                if (Environment.OSVersion.Version.Major < 6)
-                {
-                    throw new NotSupportedException("This functionality is only supported on Windows Vista or newer.");
-                }
+            return enumerator;
+        }
 
-                _realEnumerator = new _MMDeviceEnumerator() as IMMDeviceEnumerator;
-            }
+        // Release an unexpected successful activation result because it cannot be returned safely.
+        ReleaseComObject(instance);
 
-            return _realEnumerator;
+        // Report activation failures as unsupported while preserving the original COM error.
+        throw new NotSupportedException(EnumeratorFailureMessage(hr), Marshal.GetExceptionForHR(hr, new IntPtr(-1)));
+    }
+
+    private static string EnumeratorFailureMessage(int hr) => hr switch
+    {
+        E_NOINTERFACE => EnumeratorUnsupportedMessage,
+        REGDB_E_CLASSNOTREG => EnumeratorNotRegisteredMessage,
+        CO_E_NOTINITIALIZED => EnumeratorNotInitializedMessage,
+        _ => $"Core Audio activation failed with HRESULT 0x{hr:X8}. See the inner exception."
+    };
+
+    // Marks an enumerator operation as active so Dispose cannot release the RCW while it is in use.
+    // Releasing the RCW mid-call would disconnect the wrapper and cause subsequent COM calls to fail.
+    private EnumeratorLease AcquireEnumerator()
+    {
+        lock (_deviceRegistrationsLock)
+        {
+            ThrowIfDisposed();
+            var enumerator = EnumeratorCore;
+            _activeOperations++;
+            return new EnumeratorLease(this, enumerator);
         }
     }
 
+    private void ReleaseOperation()
+    {
+        lock (_deviceRegistrationsLock)
+        {
+            if (--_activeOperations == 0)
+            {
+                Monitor.PulseAll(_deviceRegistrationsLock);
+            }
+        }
+    }
+    
     private MMDeviceCollection EnumerateEndpoints(DataFlowFilter dataFlow, DeviceStateFilter stateMask)
     {
-        Marshal.ThrowExceptionForHR(Enumerator.EnumAudioEndpoints(dataFlow, stateMask, out var result));
+        using var lease = AcquireEnumerator();
+        ThrowIfFailed(lease.Enumerator.EnumAudioEndpoints(dataFlow, stateMask, out var result));
         return new MMDeviceCollection(result);
     }
 
-    private IMMDevice GetDefaultEndpoint(DataFlow dataFlow, Role role)
+    private IMMDeviceCOM GetDefaultEndpoint(DataFlow dataFlow, Role role)
     {
-        Marshal.ThrowExceptionForHR(Enumerator.GetDefaultAudioEndpoint(dataFlow, role, out var endpoint));
+        using var lease = AcquireEnumerator();
+        ThrowIfFailed(lease.Enumerator.GetDefaultAudioEndpoint(dataFlow, role, out var endpoint));
         return endpoint;
     }
 
-    private IMMDevice GetEndpoint(string deviceId)
+    private IMMDeviceCOM GetEndpoint(string deviceId)
     {
-        Marshal.ThrowExceptionForHR(Enumerator.GetDevice(deviceId, out var endpoint));
+        using var lease = AcquireEnumerator();
+        ThrowIfFailed(lease.Enumerator.GetDevice(deviceId, out var endpoint));
         return endpoint;
     }
 
-    // Deterministic release is only ever applied to COM objects that never leave the library, so a
-    // consumer can never be holding one of these. See AudioDevice.Dispose for why the device's own
-    // IMMDevice is deliberately left to the GC instead.
-    private static void ReleaseComObject(object comObject)
+    // Deterministically releases only COM objects that never leave this library.
+    // Uses ReleaseComObject to release only this library's reference, avoiding invalidation
+    // of shared RCWs that may also be used by other audio libraries.
+    private static void ReleaseComObject(object? comObject)
     {
         try
         {
@@ -439,34 +636,43 @@ public sealed class AudioController : IDisposable
                 Marshal.ReleaseComObject(comObject);
             }
         }
-        catch
+        catch (Exception cleanupException)
         {
+            ReportFailure(cleanupException);
             // best-effort cleanup
         }
     }
 
     private void ThrowIfDisposed()
     {
-        if (_disposed)
-        {
-            throw new ObjectDisposedException(nameof(AudioController));
-        }
+        RequireNotDisposed(_disposed, this);
     }
 
+    private static void WithDefaultPlayback(Action<AudioDevice> action)
+    {
+        WithDefaultPlayback(device =>
+        {
+            action(device);
+            return true;
+        });
+    }
+    
     private static T WithDefaultPlayback<T>(Func<AudioDevice, T> action)
     {
-        using (var controller = new AudioController())
-        using (var device = controller.GetDefaultPlaybackDevice())
-        {
-            if (device == null)
-            {
-                throw new InvalidOperationException("No default playback device is set.");
-            }
-
-            return action(device);
-        }
+        using var controller = new AudioController();
+        using var device = controller.GetDefaultPlaybackDevice();
+        return device == null ? throw new InvalidOperationException("No default playback device is set.") : action(device);
     }
 
+    private static void WithDevice(string deviceId, Action<AudioDevice> action)
+    {
+        WithDevice(deviceId, device =>
+        {
+            action(device);
+            return true;
+        });
+    }
+    
     private static T WithDevice<T>(string deviceId, Func<AudioDevice, T> action)
     {
         if (string.IsNullOrEmpty(deviceId))
@@ -474,21 +680,19 @@ public sealed class AudioController : IDisposable
             throw new ArgumentNullException(nameof(deviceId));
         }
 
-        using (var controller = new AudioController())
-        using (var device = controller.GetDeviceById(deviceId))
+        using var controller = new AudioController();
+        using var device = controller.GetDeviceById(deviceId);
+        if (device == null)
         {
-            if (device == null)
-            {
-                throw new ArgumentException("No device found with ID: " + deviceId, nameof(deviceId));
-            }
-
-            return action(device);
+            throw new ArgumentException("No device found with ID: " + deviceId, nameof(deviceId));
         }
+
+        return action(device);
     }
 
     // Resolves the first endpoint of the given kind whose name contains `name`, sets it as the
     // default for `roles`, then re-resolves it so the returned snapshot carries the updated flags.
-    private static AudioDeviceInfo SetDefaultByName(string name, AudioDeviceKind kind, DefaultRole roles)
+    private static AudioDeviceInfo? SetDefaultByName(string name, AudioDeviceKind kind, DefaultRole roles)
     {
         if (string.IsNullOrEmpty(name))
         {
@@ -496,15 +700,17 @@ public sealed class AudioController : IDisposable
         }
 
         using var controller = new AudioController();
-        IReadOnlyList<AudioDevice> scope = kind == AudioDeviceKind.Recording
+        var devices = kind == AudioDeviceKind.Recording
             ? controller.GetRecordingDevices()
             : controller.GetPlaybackDevices();
 
         try
         {
-            AudioDevice match = scope.FirstOrDefault(d =>
-                d.Name != null && d.Name.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0);
-
+            #if NET8_0_OR_GREATER
+            var match = devices.FirstOrDefault(x => x.Name.Contains(name, StringComparison.OrdinalIgnoreCase));
+#else
+            var match = devices.FirstOrDefault(x => x.Name.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0);
+#endif
             if (match == null)
             {
                 return null;
@@ -512,72 +718,52 @@ public sealed class AudioController : IDisposable
 
             controller.SetDefaultDevice(match, roles);
 
-            // Built from the snapshot already in hand, with the roles just applied folded in.
-            // Re-resolving the device would mean a second full default lookup and a rebuilt
-            // wrapper, for information this method already knows.
-            // IsDefault tracks the Multimedia role specifically (see GetDeviceDefaults), so
-            // assigning Console alone must not set it.
             match.IsDefault |= (roles & DefaultRole.Multimedia) != 0;
             match.IsDefaultCommunication |= (roles & DefaultRole.Communications) != 0;
             return match.ToDeviceInfo();
         }
         finally
         {
-            foreach (AudioDevice device in scope)
+            // Dispose all enumerated devices, even if no match was found, to avoid leaking COM wrappers.
+            foreach (var device in devices)
             {
                 device.Dispose();
             }
         }
     }
 
-    /// <summary>Returns a snapshot of the current default playback device.</summary>
+    /// <summary>Returns a snapshot of the current default playback device or null when no default playback device is set.</summary>
     /// <param name="communications">
     /// When <c>true</c>, resolves the default for the communications role; when <c>false</c> (the
     /// default), resolves the default for the multimedia role.
     /// </param>
     /// <returns>An immutable snapshot of the default playback endpoint.</returns>
-    /// <exception cref="InvalidOperationException">Thrown when no default playback device is set.</exception>
     /// <remarks>
     /// Creates and disposes an <see cref="AudioController"/> per call. For repeated operations,
     /// create one instance and reuse it.
     /// </remarks>
-    public static AudioDeviceInfo GetDefaultPlayback(bool communications = false)
+    public static AudioDeviceInfo? GetDefaultPlayback(bool communications = false)
     {
-        using (var controller = new AudioController())
-        using (var device = controller.GetDefaultPlaybackDevice(communications))
-        {
-            if (device == null)
-            {
-                throw new InvalidOperationException("No default playback device is set.");
-            }
-
-            return device.ToDeviceInfo();
-        }
+        using var controller = new AudioController();
+        using var device = controller.GetDefaultPlaybackDevice(communications);
+        return device?.ToDeviceInfo();
     }
 
-    /// <summary>Returns a snapshot of the current default recording device.</summary>
+    /// <summary>Returns a snapshot of the current default recording device or null when no default recording device is set.</summary>
     /// <param name="communications">
     /// When <c>true</c>, resolves the default for the communications role; when <c>false</c> (the
     /// default), resolves the default for the multimedia role.
     /// </param>
     /// <returns>An immutable snapshot of the default recording endpoint.</returns>
-    /// <exception cref="InvalidOperationException">Thrown when no default recording device is set.</exception>
     /// <remarks>
     /// Creates and disposes an <see cref="AudioController"/> per call. For repeated operations,
     /// create one instance and reuse it.
     /// </remarks>
-    public static AudioDeviceInfo GetDefaultRecording(bool communications = false)
+    public static AudioDeviceInfo? GetDefaultRecording(bool communications = false)
     {
-        using (var controller = new AudioController())
-        using (var device = controller.GetDefaultRecordingDevice(communications))
-        {
-            if (device == null)
-            {
-                throw new InvalidOperationException("No default recording device is set.");
-            }
-
-            return device.ToDeviceInfo();
-        }
+        using var controller = new AudioController();
+        using var device = controller.GetDefaultRecordingDevice(communications);
+        return device?.ToDeviceInfo();
     }
 
     /// <summary>Sets the endpoint with the given ID as the default for the requested role(s).</summary>
@@ -587,16 +773,16 @@ public sealed class AudioController : IDisposable
     /// </param>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="deviceId"/> is null or empty.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="roles"/> specifies no role.</exception>
+    /// <exception cref="NotSupportedException">Thrown when this system does not expose the undocumented
+    /// policy-config API that changing the default endpoint requires.</exception>
     /// <remarks>
     /// Creates and disposes an <see cref="AudioController"/> per call. For repeated operations,
     /// create one instance and reuse it.
     /// </remarks>
     public static void SetDefaultDevice(string deviceId, DefaultRole roles = DefaultRole.Default)
     {
-        using (var controller = new AudioController())
-        {
-            controller.SetDefaultDeviceById(deviceId, roles);
-        }
+        using var controller = new AudioController();
+        controller.SetDefaultDeviceById(deviceId, roles);
     }
 
     /// <summary>
@@ -613,11 +799,13 @@ public sealed class AudioController : IDisposable
     /// </returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="name"/> is null or empty.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="roles"/> specifies no role.</exception>
+    /// <exception cref="NotSupportedException">Thrown when this system does not expose the undocumented
+    /// policy-config API that changing the default endpoint requires.</exception>
     /// <remarks>
     /// Creates and disposes an <see cref="AudioController"/> per call. For repeated operations,
     /// create one instance and reuse it.
     /// </remarks>
-    public static AudioDeviceInfo SetDefaultPlaybackByName(string name, DefaultRole roles = DefaultRole.Default)
+    public static AudioDeviceInfo? SetDefaultPlaybackByName(string name, DefaultRole roles = DefaultRole.Default)
     {
         return SetDefaultByName(name, AudioDeviceKind.Playback, roles);
     }
@@ -636,11 +824,13 @@ public sealed class AudioController : IDisposable
     /// </returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="name"/> is null or empty.</exception>
     /// <exception cref="ArgumentException">Thrown when <paramref name="roles"/> specifies no role.</exception>
+    /// <exception cref="NotSupportedException">Thrown when this system does not expose the undocumented
+    /// policy-config API that changing the default endpoint requires.</exception>
     /// <remarks>
     /// Creates and disposes an <see cref="AudioController"/> per call. For repeated operations,
     /// create one instance and reuse it.
     /// </remarks>
-    public static AudioDeviceInfo SetDefaultRecordingByName(string name, DefaultRole roles = DefaultRole.Default)
+    public static AudioDeviceInfo? SetDefaultRecordingByName(string name, DefaultRole roles = DefaultRole.Default)
     {
         return SetDefaultByName(name, AudioDeviceKind.Recording, roles);
     }
@@ -681,11 +871,7 @@ public sealed class AudioController : IDisposable
     /// </remarks>
     public static void SetVolume(float percent)
     {
-        WithDefaultPlayback<object>(d =>
-        {
-            d.SetVolumePercent(percent);
-            return null;
-        });
+        WithDefaultPlayback(d => d.SetVolumePercent(percent));
     }
 
     /// <summary>Sets the master volume of the given endpoint from a percentage in 0..100.</summary>
@@ -700,11 +886,7 @@ public sealed class AudioController : IDisposable
     /// </remarks>
     public static void SetVolume(string deviceId, float percent)
     {
-        WithDevice<object>(deviceId, d =>
-        {
-            d.SetVolumePercent(percent);
-            return null;
-        });
+        WithDevice(deviceId, d => d.SetVolumePercent(percent));
     }
 
     /// <summary>Returns whether the default playback device is muted.</summary>
@@ -743,11 +925,7 @@ public sealed class AudioController : IDisposable
     /// </remarks>
     public static void SetMute(bool mute)
     {
-        WithDefaultPlayback<object>(d =>
-        {
-            d.IsMuted = mute;
-            return null;
-        });
+        WithDefaultPlayback(d => d.IsMuted = mute);
     }
 
     /// <summary>Sets the mute state of the given endpoint.</summary>
@@ -762,11 +940,7 @@ public sealed class AudioController : IDisposable
     /// </remarks>
     public static void SetMute(string deviceId, bool mute)
     {
-        WithDevice<object>(deviceId, d =>
-        {
-            d.IsMuted = mute;
-            return null;
-        });
+        WithDevice(deviceId, d => d.IsMuted = mute);
     }
 
     /// <summary>Inverts the mute state of the default playback device.</summary>
@@ -806,10 +980,8 @@ public sealed class AudioController : IDisposable
     /// </remarks>
     public static IReadOnlyList<AudioDeviceInfo> ListDevices()
     {
-        using (var controller = new AudioController())
-        {
-            return Snapshot(controller.GetDevices());
-        }
+        using var controller = new AudioController();
+        return Snapshot(controller.GetDevices());
     }
 
     /// <summary>Returns snapshots of the active endpoints of the given kind, in enumeration order.</summary>
@@ -823,25 +995,21 @@ public sealed class AudioController : IDisposable
     /// </remarks>
     public static IReadOnlyList<AudioDeviceInfo> ListDevices(AudioDeviceKind kind)
     {
-        using (var controller = new AudioController())
-        {
-            return Snapshot(kind == AudioDeviceKind.Recording
-                ? controller.GetRecordingDevices()
-                : controller.GetPlaybackDevices());
-        }
+        using var controller = new AudioController();
+        return Snapshot(kind == AudioDeviceKind.Recording
+            ? controller.GetRecordingDevices()
+            : controller.GetPlaybackDevices());
     }
 
-    private static IReadOnlyList<AudioDeviceInfo> Snapshot(IReadOnlyList<AudioDevice> devices)
+    private static AudioDeviceInfo[] Snapshot(IReadOnlyList<AudioDevice> devices)
     {
-        var result = new List<AudioDeviceInfo>(devices.Count);
-        foreach (AudioDevice device in devices)
+        AudioDeviceInfo[] result = new AudioDeviceInfo[devices.Count];
+        for (var i = 0; i < devices.Count; i++)
         {
-            using (device)
-            {
-                result.Add(device.ToDeviceInfo());
-            }
+            using var device = devices[i];
+            result[i] = device.ToDeviceInfo();
         }
-
+        
         return result;
     }
 
@@ -862,56 +1030,65 @@ public sealed class AudioController : IDisposable
     /// </remarks>
     public IDisposable RegisterDeviceNotification(IAudioDeviceEvents consumer)
     {
-        if (consumer == null)
+        RequireNotNull(consumer, nameof(consumer));
+        lock (_notificationLock)
         {
-            throw new ArgumentNullException(nameof(consumer));
-        }
-
-        MMNotificationClientComAdapter adapter;
-        DeviceEventsRegistration token;
-        lock (_deviceRegistrationsLock)
-        {
-            if (_disposed)
+            using var lease = AcquireEnumerator();
+            lock (_deviceRegistrationsLock)
             {
-                throw new ObjectDisposedException(nameof(AudioController));
+                if (_deviceRegistrations.TryGetValue(consumer, out var existing))
+                {
+                    return existing.Token;
+                }
             }
-
-            if (_deviceRegistrations.TryGetValue(consumer, out var existing))
+            var adapter = new MMNotificationClientComAdapter(consumer);
+            var token = new DeviceEventsRegistration(this, adapter);
+            ThrowIfFailed(lease.Enumerator.RegisterEndpointNotificationCallback(adapter));
+            lock (_deviceRegistrationsLock)
             {
-                // Already registered: hand back the same token for the existing registration.
-                return existing.Token;
+                if (!_disposed)
+                {
+                    _deviceRegistrations[consumer] = new DeviceRegistration(adapter, token);
+                    return token;
+                }
             }
-
-            adapter = new MMNotificationClientComAdapter(consumer);
-            token = new DeviceEventsRegistration(this, adapter);
-            _deviceRegistrations[consumer] = new DeviceRegistration(adapter, token);
+            // Dispose won the race. The lease keeps the enumerator alive through rollback.
+            int hr = lease.Enumerator.UnregisterEndpointNotificationCallback(adapter);
+            if (hr != HresultNotFound)
+            {
+                ThrowIfFailed(hr);
+            }
+            throw new ObjectDisposedException(nameof(AudioController));
         }
-
-        Marshal.ThrowExceptionForHR(Enumerator.RegisterEndpointNotificationCallback(adapter));
-        return token;
     }
 
-    // Called by a registration token to undo exactly one registration. Idempotent: a no-op if the
-    // adapter was already removed (e.g. by Dispose or a second token).
     internal void RemoveDeviceRegistration(MMNotificationClientComAdapter adapter)
     {
-        if (adapter == null)
+        lock (_notificationLock)
         {
-            return;
-        }
-
-        lock (_deviceRegistrationsLock)
-        {
-            if (!_deviceRegistrations.TryGetValue(adapter.Target, out var existing) ||
-                !ReferenceEquals(existing.Adapter, adapter))
+            EnumeratorLease lease;
+            lock (_deviceRegistrationsLock)
             {
-                return;
+                if (_disposed || !_deviceRegistrations.TryGetValue(adapter.Target, out var existing) ||
+                    !ReferenceEquals(existing.Adapter, adapter))
+                {
+                    return;
+                }
+                lease = AcquireEnumerator();
             }
-
-            _deviceRegistrations.Remove(adapter.Target);
+            using (lease)
+            {
+                int hr = lease.Enumerator.UnregisterEndpointNotificationCallback(adapter);
+                if (hr != HresultNotFound)
+                {
+                    ThrowIfFailed(hr);
+                }
+                lock (_deviceRegistrationsLock)
+                {
+                    _deviceRegistrations.Remove(adapter.Target);
+                }
+            }
         }
-
-        Marshal.ThrowExceptionForHR(Enumerator.UnregisterEndpointNotificationCallback(adapter));
     }
 
     /// <summary>
@@ -919,6 +1096,14 @@ public sealed class AudioController : IDisposable
     /// callbacks. The controller does not own the <see cref="AudioDevice"/> instances returned by its
     /// methods; dispose of those yourself when you have accessed their volume/session features.
     /// </summary>
+    /// <remarks>
+    /// Waits up to five seconds for calls already in progress on other threads to finish, because
+    /// releasing the underlying COM enumerator (or the cached policy-config client) while one is
+    /// running would disconnect it mid-call.
+    /// If they have not finished by then the enumerator is left to the garbage collector rather than
+    /// blocking any longer. Calls that start after this returns throw
+    /// <see cref="ObjectDisposedException"/>.
+    /// </remarks>
     public void Dispose()
     {
         List<MMNotificationClientComAdapter> toUnregister;
@@ -931,7 +1116,7 @@ public sealed class AudioController : IDisposable
 
             _disposed = true;
             toUnregister = new List<MMNotificationClientComAdapter>(_deviceRegistrations.Count);
-            foreach (DeviceRegistration reg in _deviceRegistrations.Values)
+            foreach (var reg in _deviceRegistrations.Values)
             {
                 toUnregister.Add(reg.Adapter);
             }
@@ -939,30 +1124,109 @@ public sealed class AudioController : IDisposable
             _deviceRegistrations.Clear();
         }
 
-        foreach (MMNotificationClientComAdapter adapter in toUnregister)
+        foreach (var adapter in toUnregister)
         {
             try
             {
-                // Read the field, not the Enumerator property: if nothing ever enumerated there is
-                // no enumerator to create just to unregister nothing.
-                _realEnumerator?.UnregisterEndpointNotificationCallback(adapter);
+                // Read the field, not EnumeratorCore: if nothing ever enumerated there is no
+                // enumerator to create just to unregister nothing.
+                if (_deviceEnumerator != null)
+                {
+                    int hr = _deviceEnumerator.UnregisterEndpointNotificationCallback(adapter);
+                    if (hr != HresultNotFound)
+                    {
+                        ThrowIfFailed(hr);
+                    }
+                }
             }
-            catch
+            catch (Exception cleanupException)
             {
+                ReportFailure(cleanupException);
                 // best-effort cleanup
             }
         }
 
-        // The enumerator never leaves the controller, so releasing it here cannot strand anyone.
-        ReleaseComObject(_realEnumerator);
-        _realEnumerator = null;
-    }
-}
+        lock (_deviceRegistrationsLock)
+        {
+            // Wait for existing leases before releasing COM wrappers; disposal prevents new leases.
+            // Bound the wait because native calls can hang indefinitely.
+            // On timeout, leave COM cleanup to the GC rather than disconnecting an in-flight call.
+            var deadline = System.Diagnostics.Stopwatch.StartNew();
+            var drained = true;
+            while (_activeOperations > 0 && drained)
+            {
+                var remaining = DisposeDrainTimeout - deadline.Elapsed;
+                drained = remaining > TimeSpan.Zero && Monitor.Wait(_deviceRegistrationsLock, remaining);
+            }
 
-// The Core Audio MMDeviceEnumerator coclass. Internal because on its own it is no good: it exists
-// only to be cast to IMMDeviceEnumerator.
-[ComImport]
-[Guid("BCDE0395-E52F-467C-8E3D-C4579291692E")]
-internal class _MMDeviceEnumerator
-{
+            if (_activeOperations == 0)
+            {
+                // Released under the lock so that nothing can observe, and re-create, a null field.
+                ReleaseComObject(_deviceEnumerator);
+
+                // Same condition, same reason: a SetDefaultDevice call that is still running holds
+                // this client, and releasing its wrapper now would disconnect it mid-call. On a
+                // drain timeout both wrappers are left to the GC together.
+                _policyClient?.Dispose();
+                _policyClient = null;
+            }
+
+            _deviceEnumerator = null;
+        }
+    }
+    
+    // Snapshot of default endpoint IDs for a data-flow direction.
+    // Null indicates no default endpoint or a direction that was not requested.
+    private sealed class DeviceDefaultIds
+    {
+        public string? DefaultPlaybackId;
+        public string? DefaultRecordingId;
+        public string? CommPlaybackId;
+        public string? CommRecordingId;
+
+        // Takes the ID rather than the device: AudioDevice snapshots its ID at construction, so
+        // comparing strings here avoids two IMMDevice::GetId round trips per device.
+        public bool IsDefault(string deviceId)
+        {
+            return SameEndpointId(deviceId, DefaultPlaybackId) || SameEndpointId(deviceId, DefaultRecordingId);
+        }
+
+        public bool IsDefaultComm(string deviceId)
+        {
+            return SameEndpointId(deviceId, CommPlaybackId) || SameEndpointId(deviceId, CommRecordingId);
+        }
+    }
+    
+    // Pairs the COM sink adapter with the token handed to the caller, cached together so that
+    // removing the entry on disposal invalidates the cache: the next Register then creates a fresh one.
+    private sealed class DeviceRegistration
+    {
+        internal readonly MMNotificationClientComAdapter Adapter;
+        internal readonly DeviceEventsRegistration Token;
+
+        internal DeviceRegistration(MMNotificationClientComAdapter adapter, DeviceEventsRegistration token)
+        {
+            Adapter = adapter;
+            Token = token;
+        }
+    }
+    
+    // Scopes one enumerator borrow. A struct so the common path costs nothing to allocate.
+    private readonly struct EnumeratorLease : IDisposable
+    {
+        private readonly AudioController _owner;
+
+        internal IMMDeviceEnumeratorCOM Enumerator { get; }
+
+        internal EnumeratorLease(AudioController owner, IMMDeviceEnumeratorCOM enumerator)
+        {
+            _owner = owner;
+            Enumerator = enumerator;
+        }
+
+        public void Dispose()
+        {
+            _owner?.ReleaseOperation();
+        }
+    }
 }

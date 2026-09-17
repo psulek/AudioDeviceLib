@@ -18,8 +18,12 @@ internal static class PropertyKeyNames
     private static readonly Guid AudioEndpoint =
         new Guid(0x1da5d803, 0xd492, 0x4edd, 0x8c, 0x23, 0xe0, 0xc0, 0xff, 0xee, 0x7f, 0x0e);
 
-    private static readonly Guid AudioEngine =
+    private static readonly Guid AudioEngineDeviceFormat =
         new Guid(0xf19f064d, 0x082c, 0x4e27, 0xbc, 0x73, 0x68, 0x82, 0xa1, 0xbb, 0x8e, 0x4c);
+
+    // AudioEngineOemFormat is in a set of its own, not pid 3 of the DeviceFormat set.
+    private static readonly Guid AudioEngineOemFormat =
+        new Guid(0xe4870e26, 0x3cc5, 0x4cd2, 0xba, 0x46, 0xca, 0x0a, 0x9a, 0x70, 0xed, 0x04);
 
     private static readonly Guid Device =
         new Guid(0xa45c254e, 0xdf1c, 0x4efd, 0x80, 0x20, 0x67, 0xd1, 0x46, 0xa8, 0x50, 0xe0);
@@ -46,9 +50,12 @@ internal static class PropertyKeyNames
                 [7] = "AudioEndpoint.Supports_EventDriven_Mode",
                 [8] = "AudioEndpoint.JackSubType",
             },
-            [AudioEngine] = new Dictionary<int, string>
+            [AudioEngineDeviceFormat] = new Dictionary<int, string>
             {
                 [0] = "AudioEngine.DeviceFormat",
+            },
+            [AudioEngineOemFormat] = new Dictionary<int, string>
+            {
                 [3] = "AudioEngine.OEMFormat",
             },
             [Device] = new Dictionary<int, string>
@@ -72,11 +79,11 @@ internal static class PropertyKeyNames
     /// <summary>Returns a friendly name for the key, or a "{fmtid}/{pid}" fallback when unknown.</summary>
     internal static string GetName(PropertyKey key)
     {
-        if (Names.TryGetValue(key.fmtid, out var byPid) && byPid.TryGetValue(key.pid, out var name))
+        if (Names.TryGetValue(key.FormatId, out var byPid) && byPid.TryGetValue(key.PropertyId, out var name))
         {
             return name;
         }
 
-        return key.fmtid.ToString("B") + "/" + key.pid;
+        return key.FormatId.ToString("B") + "/" + key.PropertyId;
     }
 }
