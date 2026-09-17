@@ -11,6 +11,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using AudioDeviceLib.CoreAudioApi;
 using AudioDeviceLib.Lib;
 using NUnit.Framework;
@@ -267,5 +268,39 @@ public class DeviceTests
         Assert.That(AudioController.IsMuted(), Is.EqualTo(device.IsMuted));
         Assert.That(AudioController.GetVolume(device.Id), Is.EqualTo(device.GetVolumePercent()).Within(0.5f));
         Assert.That(AudioController.IsMuted(device.Id), Is.EqualTo(device.IsMuted));
+    }
+    [Test]
+    public void PropVariant_Clear_ResetsToEmpty()
+    {
+        using var audio = new AudioController();
+        using AudioDevice device = AudioFixture.RequireDefaultPlayback(audio);
+
+        Assert.That(
+            device.Properties.TryGetValue(PKEY.PKEY_DeviceInterface_FriendlyName, out PropVariant value),
+            Is.True, "the endpoint has no friendly name to test against");
+        Assert.That(value.VarType, Is.EqualTo(VarEnum.VT_LPWSTR));
+        Assert.That(value.Value, Is.EqualTo(device.Name));
+
+        value.Clear();
+
+        Assert.That(value.IsEmpty, Is.True);
+        Assert.That(value.VarType, Is.EqualTo(VarEnum.VT_EMPTY));
+        Assert.That(value.Value, Is.Null);
+    }
+
+    // PropertyStoreProperty reads the value out of the variant and releases it in its constructor.
+    // Reversing those two steps would leave this reading freed memory, so the assertion is on the
+    // value itself rather than on the release.
+    [Test]
+    public void PropertyStoreProperty_Value_SurvivesTheVariantBeingReleased()
+    {
+        using var audio = new AudioController();
+        using AudioDevice device = AudioFixture.RequireDefaultPlayback(audio);
+
+        PropertyStoreProperty property = device.Properties[PKEY.PKEY_DeviceInterface_FriendlyName];
+
+        Assert.That(property, Is.Not.Null);
+        Assert.That(property.Value, Is.EqualTo(device.Name));
+        Assert.That(property.Value, Is.EqualTo(device.Name), "second read differs - the value is not owned");
     }
 }

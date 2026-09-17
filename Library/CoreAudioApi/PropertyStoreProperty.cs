@@ -33,6 +33,8 @@
     directives removed.
   - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
     documentation comments.
+  - The constructor now reads the value out of the PROPVARIANT and releases it, instead of storing
+    the variant and leaving its native payload to leak.
 */
 
 namespace AudioDeviceLib.CoreAudioApi;
@@ -41,17 +43,22 @@ namespace AudioDeviceLib.CoreAudioApi;
 public class PropertyStoreProperty
 {
     private PropertyKey _PropertyKey;
-    private PropVariant _PropValue;
+    private object _Value;
 
     internal PropertyStoreProperty(PropertyKey key, PropVariant value)
     {
         _PropertyKey = key;
-        _PropValue = value;
+
+        // Read the value out and release the variant here. PropVariant.Value copies strings and
+        // blobs into managed memory, so nothing is lost by clearing immediately - and without it
+        // every property read through a PropertyStore indexer leaks its payload.
+        _Value = value.Value;
+        value.Clear();
     }
 
     /// <summary>Gets the key that identifies this property.</summary>
     public PropertyKey Key => _PropertyKey;
 
     /// <summary>Gets the property value, converted to a managed type where supported.</summary>
-    public object Value => _PropValue.Value;
+    public object Value => _Value;
 }

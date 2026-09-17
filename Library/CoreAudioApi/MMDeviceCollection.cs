@@ -48,8 +48,8 @@ using AudioDeviceLib.Lib;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
-/// <summary>A read-only collection of <see cref="MMDevice"/> audio endpoints returned by an enumeration.</summary>
-public class MMDeviceCollection : IDisposable
+/// <summary>A read-only collection of <see cref="AudioDevice"/> audio endpoints returned by an enumeration.</summary>
+internal class MMDeviceCollection : IDisposable
 {
     private IMMDeviceCollection _MMDeviceCollection;
     private int _count = -1;

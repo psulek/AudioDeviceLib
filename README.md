@@ -24,7 +24,10 @@ uses the same, well-established techniques as `AudioDeviceCmdlets`:
 - The `AudioController` / `AudioDevice` facade is derived from the MIT-licensed
   [`AudioDeviceCmdlets`](https://github.com/frgnca/AudioDeviceCmdlets) by Francois Gendron.
   The PowerShell cmdlet layer was **not** copied; it was replaced with a plain managed API.
-- The `CoreAudioApi/` interop is the WASAPI wrapper by Ray Molenkamp (zlib-style license).
+- The Core Audio (WASAPI) interop is the wrapper by Ray Molenkamp (zlib-style license).
+  Most of it lives under `CoreAudioApi/`; two files are in `Lib/`, because the original
+  `MMDevice` was merged into `Lib/AudioDevice.cs` and the original `MMDeviceEnumerator`
+  into `Lib/AudioController.cs`.
 
 See `THIRD-PARTY-NOTICES.md` for the full required notices.
 
@@ -34,11 +37,11 @@ See `THIRD-PARTY-NOTICES.md` for the full required notices.
 dotnet add package AudioDeviceLib --prerelease
 ```
 
-The current release is `1.0.0-rc.1`, a release candidate. NuGet does not resolve prereleases by
+The current release is `1.0.0-rc.2`, a release candidate. NuGet does not resolve prereleases by
 default, so the `--prerelease` flag is required — or pin it explicitly:
 
 ```xml
-<PackageReference Include="AudioDeviceLib" Version="1.0.0-rc.1" />
+<PackageReference Include="AudioDeviceLib" Version="1.0.0-rc.2" />
 ```
 
 ## Usage
@@ -138,29 +141,45 @@ endpoint — reference equality never is.
 (in `AudioDeviceLib.CoreAudioApi`) if you need endpoints that are disabled, not present
 or unplugged — the static `ListDevices` returns active endpoints only.
 
+To resolve one endpoint by ID, `GetDeviceById` returns a live `AudioDevice` and
+`GetDeviceInfo` an `AudioDeviceInfo` snapshot:
+
+```csharp
+using (AudioDevice device = audio.GetDeviceById(id))
+{
+    bool active = device.IsActive; // shorthand for State == DeviceState.Active
+}
+
+AudioDeviceInfo info = audio.GetDeviceInfo(id);
+```
+
+Both reject a null or empty ID with `ArgumentNullException`. A malformed ID throws
+`ArgumentException`; an ID that is well-formed but matches no endpoint throws `COMException`.
+
 ## Disposal
 
-Much of the object graph implements `IDisposable`, so callers should dispose what
-they own with `using`:
+Types which implements `IDisposable`. Dispose each one you obtain, with `using` or by calling
+`.Dispose()`:
 
-- `AudioController` — dispose the controller itself (shown above). That unregisters any
-  device-notification sinks still attached; it does **not** dispose devices it handed you.
-- `AudioDevice` — dispose every device you obtain. Disposal tears down the Core Audio
-  callbacks and activations that device made, and afterwards every member that talks to
-  Core Audio (`Volume`, `SessionManager`, `Meter`, `Properties`, `Refresh`, the volume and
-  mute helpers) throws `ObjectDisposedException`. The identity snapshot (`Id`, `Name`,
-  `Kind`, `State`, `ToDeviceInfo()`, `ToString()`, `Equals()`) stays readable. Disposing
-  twice is a no-op, and disposing one device never affects another — each one wraps its
-  own Core Audio endpoint object.
-- Session notifications — `RegisterAudioSessionNotification` returns an `IDisposable`
-  token; dispose it (or the owning device) to unregister the sink.
-- The **static** methods own and dispose everything they create, and return
-  `AudioDeviceInfo` snapshots rather than live devices — there is nothing for you to
-  dispose.
+- `AudioController`
+- `AudioDevice`
+- the token returned by `AudioController.RegisterDeviceNotification`
+- the token returned by `AudioSessionControl.RegisterAudioSessionNotification`
 
-By convention the code in this repo also always uses **full braces** for `if`, `foreach`
-and other control-flow blocks — even single-statement bodies — for clarity and to avoid
-accidental scope bugs; the examples above follow that style.
+Disposing an `AudioDevice` also disposes its `Volume` (`AudioEndpointVolume`),
+`SessionManager` (`AudioSessionManager`), `SessionManager.Sessions` (`SessionCollection`)
+and every `AudioSessionControl` in that collection.
+
+Disposing twice is a no-op. Afterwards, members that call into Core Audio throw
+`ObjectDisposedException` on both `AudioController` and `AudioDevice`; the `AudioDevice`
+identity snapshot (`Id`, `Name`, `Kind`, `State`, `ToDeviceInfo()`, `ToString()`,
+`Equals()`) stays readable.
+
+The static methods return `AudioDeviceInfo` snapshots and leave nothing to dispose.
+
+`PropVariant` is not `IDisposable` but owns native memory: call `.Clear()` on one returned by
+`PropertyStore.TryGetValue` or `PropertyStore.GetValue(int)`. The `PropertyStore` indexers return
+`PropertyStoreProperty`, which already does this.
 
 ## Session notifications
 

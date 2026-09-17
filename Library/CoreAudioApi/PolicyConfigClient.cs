@@ -30,7 +30,7 @@ internal class _PolicyConfigClient
 /// Used to change the default audio endpoint. Automatically selects the interface variant
 /// supported by the running Windows version.
 /// </summary>
-public class PolicyConfigClient
+internal class PolicyConfigClient
 {
     private readonly IPolicyConfig _PolicyConfig;
     private readonly IPolicyConfigVista _PolicyConfigVista;

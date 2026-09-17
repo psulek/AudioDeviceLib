@@ -379,14 +379,21 @@ public sealed class AudioDevice : IDisposable
         // One OpenPropertyStore plus one GetValue. This deliberately avoids the PropertyStore
         // indexers, which scan the whole store - a few hundred COM round trips per name, since
         // FriendlyName sits near the end of the enumeration order.
-        if (!PropertyStoreCore.TryGetValue(PKEY.PKEY_DeviceInterface_FriendlyName, out PropVariant value))
-        {
-            return "Unknown";
-        }
+        bool found = PropertyStoreCore.TryGetValue(
+            PKEY.PKEY_DeviceInterface_FriendlyName, out PropVariant value);
 
-        // A present-but-unexpected variant type yields null from Value rather than a string, so the
-        // fallback covers that case too.
-        return value.Value as string ?? "Unknown";
+        try
+        {
+            // A present-but-unexpected variant type yields null from Value rather than a string, so
+            // the fallback covers that case too.
+            return found ? (value.Value as string ?? "Unknown") : "Unknown";
+        }
+        finally
+        {
+            // The variant is this method's to release; without it every name read leaks its string,
+            // and a name is read for every device on every enumeration.
+            value.Clear();
+        }
     }
 
     private void ThrowIfDisposed()

@@ -130,6 +130,7 @@ public class PropertyStore
     /// <summary>Gets the raw property value at the specified zero-based index.</summary>
     /// <param name="index">The zero-based property index (0 to <see cref="Count"/> - 1).</param>
     /// <returns>The <see cref="PropVariant"/> value at the requested position.</returns>
+    /// <remarks>The returned value owns native memory. Call <see cref="PropVariant.Clear"/> on it when done.</remarks>
     /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public PropVariant GetValue(int index)
     {
@@ -183,6 +184,7 @@ public class PropertyStore
     /// <param name="key">The property key (set GUID and property id) to read.</param>
     /// <param name="value">The value read, or an empty variant when the key is not present.</param>
     /// <returns><c>true</c> if the store holds a value for <paramref name="key"/>; otherwise <c>false</c>.</returns>
+    /// <remarks>The returned value owns native memory. Call <see cref="PropVariant.Clear"/> on it when done.</remarks>
     public bool TryGetValue(PropertyKey key, out PropVariant value)
     {
         // IPropertyStore::GetValue takes the key directly, so this is one COM call where the
