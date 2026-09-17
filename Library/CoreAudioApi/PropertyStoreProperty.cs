@@ -33,8 +33,7 @@
     directives removed.
   - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
     documentation comments.
-  - The constructor now reads the value out of the PROPVARIANT and releases it, instead of storing
-    the variant and leaving its native payload to leak.
+  - Stores a managed PropertyValue snapshot; native ownership is handled by PropVariant.ToPropertyValue.
 */
 
 using JetBrains.Annotations;
@@ -45,19 +44,11 @@ namespace AudioDeviceLib.CoreAudioApi;
 [PublicAPI]
 public class PropertyStoreProperty
 {
-  //private object _Value;
-
     internal PropertyStoreProperty(PropertyKey key, PropertyValue value)
     {
         Key = key;
         Value = value;
     }
-    // internal PropertyStoreProperty(PropertyKey key, PropVariant value)
-    // {
-    //     _PropertyKey = key;
-    //     _Value = value.Value;
-    //     value.Clear();
-    // }
 
     /// <summary>Gets the key that identifies this property.</summary>
     public PropertyKey Key { get; }

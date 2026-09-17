@@ -11,7 +11,6 @@
 
 using System;
 using System.Collections.Generic;
-using System.Runtime.InteropServices;
 using AudioDeviceLib.CoreAudioApi;
 using AudioDeviceLib.Lib;
 using NUnit.Framework;
@@ -165,7 +164,7 @@ public class DeviceTests
 
     // IPropertyStore::GetValue returns S_OK with a VT_EMPTY variant for a key that is not in the
     // store - success, not failure. TryGetValue has to treat emptiness as "not found", otherwise the
-    // caller gets an empty PropVariant reported as a hit.
+    // caller gets an empty snapshot reported as a hit.
     [Test]
     public void Properties_TryGetValue_AbsentKey_ReturnsFalseAndEmptyVariant()
     {
@@ -182,7 +181,7 @@ public class DeviceTests
 
         Assert.That(found, Is.False, "an absent key must not report as found");
         Assert.That(value.IsEmpty, Is.True);
-        Assert.That(value.Value, Is.Null, "PropVariant.Value must be null for VT_EMPTY, not a placeholder string");
+        Assert.That(value.Value, Is.Null, "PropertyValue.Value must be null for VT_EMPTY, not a placeholder string");
     }
 
     [Test]
@@ -270,28 +269,7 @@ public class DeviceTests
         Assert.That(AudioController.IsMuted(device.Id), Is.EqualTo(device.IsMuted));
     }
     
-    // [Test]
-    // public void PropVariant_Clear_ResetsToEmpty()
-    // {
-    //     using var audio = new AudioController();
-    //     using AudioDevice device = AudioFixture.RequireDefaultPlayback(audio);
-    //
-    //     Assert.That(
-    //         device.Properties.TryGetValue(PKEY.PKEY_DeviceInterface_FriendlyName, out var value),
-    //         Is.True, "the endpoint has no friendly name to test against");
-    //     Assert.That(value.VarType, Is.EqualTo(VarEnum.VT_LPWSTR));
-    //     Assert.That(value.Value, Is.EqualTo(device.Name));
-    //
-    //     //value.Clear();
-    //
-    //     Assert.That(value.IsEmpty, Is.True);
-    //     Assert.That(value.VarType, Is.EqualTo(VarEnum.VT_EMPTY));
-    //     Assert.That(value.Value, Is.Null);
-    // }
-
-    // PropertyStoreProperty reads the value out of the variant and releases it in its constructor.
-    // Reversing those two steps would leave this reading freed memory, so the assertion is on the
-    // value itself rather than on the release.
+    // PropertyStore converts and clears the native variant before returning the snapshot.
     [Test]
     public void PropertyStoreProperty_Value_SurvivesTheVariantBeingReleased()
     {

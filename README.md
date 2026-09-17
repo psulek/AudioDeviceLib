@@ -33,16 +33,13 @@ See `THIRD-PARTY-NOTICES.md` for the full required notices.
 
 ## Install
 
+Get the package from [NuGet](https://www.nuget.org/packages/AudioDeviceLib):
+
 ```
 dotnet add package AudioDeviceLib --prerelease
 ```
 
-The current release is `1.0.0-rc.2`, a release candidate. NuGet does not resolve prereleases by
-default, so the `--prerelease` flag is required — or pin it explicitly:
-
-```xml
-<PackageReference Include="AudioDeviceLib" Version="1.0.0-rc.2" />
-```
+Currently, there are only pre-release versions, so `--prerelease` flag is required to install `AudioDeviceLib` package.
 
 ## Usage
 
@@ -177,9 +174,22 @@ identity snapshot (`Id`, `Name`, `Kind`, `State`, `ToDeviceInfo()`, `ToString()`
 
 The static methods return `AudioDeviceInfo` snapshots and leave nothing to dispose.
 
-`PropVariant` is not `IDisposable` but owns native memory: call `.Clear()` on one returned by
-`PropertyStore.TryGetValue` or `PropertyStore.GetValue(int)`. The `PropertyStore` indexers return
-`PropertyStoreProperty`, which already does this.
+Property reads return managed snapshots. The library releases native PROPVARIANT memory
+internally; neither PropertyValue nor PropertyStoreProperty needs cleanup.
+Unsupported variant types have a null Value while IsEmpty is false; inspect VarType.
+
+### Migrating from 1.0.0-rc.2 to rc.3
+
+This release changes the public property API and requires recompiling consumers:
+
+- PropVariant is now internal. GetValue(int) returns PropertyValue, and TryGetValue
+  uses an out PropertyValue parameter. Replace explicit PropVariant declarations
+  with PropertyValue or var, and remove caller-side Clear() calls.
+- PropertyStoreProperty.Value now returns PropertyValue rather than object.
+  For example, change (string)property.Value to (string)property.Value.Value.
+- Contains(key) tests key presence, including empty/null values. The key indexer
+  returns an entry for those keys and propagates COM read failures.
+  TryGetValue returns false for empty/null values or a failed COM read.
 
 ## Session notifications
 
