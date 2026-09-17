@@ -65,10 +65,8 @@ public class AudioMeterInformationChannels
         get
         {
             float[] peakValues = new float[Count];
-            GCHandle Params = GCHandle.Alloc(peakValues, GCHandleType.Pinned);
             Marshal.ThrowExceptionForHR(
-                _AudioMeterInformation.GetChannelsPeakValues(peakValues.Length, Params.AddrOfPinnedObject()));
-            Params.Free();
+                _AudioMeterInformation.GetChannelsPeakValues(peakValues.Length, peakValues));
             return peakValues[index];
         }
     }

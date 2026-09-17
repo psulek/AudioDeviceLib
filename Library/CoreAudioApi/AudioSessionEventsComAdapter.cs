@@ -42,7 +42,7 @@ internal sealed class AudioSessionEventsComAdapter : IAudioSessionEventsCOM
         Target = target ?? throw new ArgumentNullException(nameof(target));
     }
 
-    public int OnDisplayNameChanged(string NewDisplayName, Guid EventContext)
+    public int OnDisplayNameChanged(string NewDisplayName, ref Guid EventContext)
     {
         try
         {
@@ -55,7 +55,7 @@ internal sealed class AudioSessionEventsComAdapter : IAudioSessionEventsCOM
         }
     }
 
-    public int OnIconPathChanged(string NewIconPath, Guid EventContext)
+    public int OnIconPathChanged(string NewIconPath, ref Guid EventContext)
     {
         try
         {
@@ -68,7 +68,7 @@ internal sealed class AudioSessionEventsComAdapter : IAudioSessionEventsCOM
         }
     }
 
-    public int OnSimpleVolumeChanged(float NewVolume, bool newMute, Guid EventContext)
+    public int OnSimpleVolumeChanged(float NewVolume, bool newMute, ref Guid EventContext)
     {
         try
         {
@@ -82,7 +82,7 @@ internal sealed class AudioSessionEventsComAdapter : IAudioSessionEventsCOM
     }
 
     public int OnChannelVolumeChanged(uint ChannelCount, IntPtr NewChannelVolumeArray, uint ChangedChannel,
-        Guid EventContext)
+        ref Guid EventContext)
     {
         try
         {
@@ -106,7 +106,7 @@ internal sealed class AudioSessionEventsComAdapter : IAudioSessionEventsCOM
         }
     }
 
-    public int OnGroupingParamChanged(Guid NewGroupingParam, Guid EventContext)
+    public int OnGroupingParamChanged(ref Guid NewGroupingParam, ref Guid EventContext)
     {
         try
         {

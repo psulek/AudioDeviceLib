@@ -41,7 +41,7 @@ namespace AudioDeviceLib.CoreAudioApi.Interfaces;
 
 [Guid("5CDF2C82-841E-4546-9722-0CF74078229A"),
  InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-internal interface IAudioEndpointVolume
+internal unsafe interface IAudioEndpointVolume
 {
     [PreserveSig]
     int RegisterControlChangeNotify(IAudioEndpointVolumeCallback pNotify);
@@ -53,10 +53,11 @@ internal interface IAudioEndpointVolume
     int GetChannelCount(out int pnChannelCount);
 
     [PreserveSig]
-    int SetMasterVolumeLevel(float fLevelDB, Guid pguidEventContext);
+    int SetMasterVolumeLevel(float fLevelDB, Guid* pguidEventContext);
+    // int SetMasterVolumeLevel(float fLevelDB, IntPtr pguidEventContext);
 
     [PreserveSig]
-    int SetMasterVolumeLevelScalar(float fLevel, Guid pguidEventContext);
+    int SetMasterVolumeLevelScalar(float fLevel, Guid* pguidEventContext);
 
     [PreserveSig]
     int GetMasterVolumeLevel(out float pfLevelDB);
@@ -65,10 +66,12 @@ internal interface IAudioEndpointVolume
     int GetMasterVolumeLevelScalar(out float pfLevel);
 
     [PreserveSig]
-    int SetChannelVolumeLevel(uint nChannel, float fLevelDB, Guid pguidEventContext);
+    int SetChannelVolumeLevel(uint nChannel, float fLevelDB, Guid* pguidEventContext);
+    // int SetChannelVolumeLevel(uint nChannel, float fLevelDB, IntPtr pguidEventContext);
 
     [PreserveSig]
-    int SetChannelVolumeLevelScalar(uint nChannel, float fLevel, Guid pguidEventContext);
+    int SetChannelVolumeLevelScalar(uint nChannel, float fLevel, Guid* pguidEventContext);
+    // int SetChannelVolumeLevelScalar(uint nChannel, float fLevel, IntPtr pguidEventContext);
 
     [PreserveSig]
     int GetChannelVolumeLevel(uint nChannel, out float pfLevelDB);
@@ -77,7 +80,8 @@ internal interface IAudioEndpointVolume
     int GetChannelVolumeLevelScalar(uint nChannel, out float pfLevel);
 
     [PreserveSig]
-    int SetMute([MarshalAs(UnmanagedType.Bool)] Boolean bMute, Guid pguidEventContext);
+    int SetMute([MarshalAs(UnmanagedType.Bool)] Boolean bMute, Guid* pguidEventContext);
+    // int SetMute([MarshalAs(UnmanagedType.Bool)] Boolean bMute, IntPtr pguidEventContext);
 
     [PreserveSig]
     int GetMute(out bool pbMute);
@@ -86,10 +90,12 @@ internal interface IAudioEndpointVolume
     int GetVolumeStepInfo(out uint pnStep, out uint pnStepCount);
 
     [PreserveSig]
-    int VolumeStepUp(Guid pguidEventContext);
+    int VolumeStepUp(Guid* pguidEventContext);
+    // int VolumeStepUp(IntPtr pguidEventContext);
 
     [PreserveSig]
-    int VolumeStepDown(Guid pguidEventContext);
+    int VolumeStepDown(Guid* pguidEventContext);
+    // int VolumeStepDown(IntPtr pguidEventContext);
 
     [PreserveSig]
     int QueryHardwareSupport(out uint pdwHardwareSupportMask);

@@ -259,7 +259,7 @@ internal static class Program
         AudioEndpointVolume endpointVolume = device.Volume;
         AudioEndpointVolumeNotificationDelegate endpointHandler = data =>
             Console.WriteLine(
-                $"[endpoint: {device.Name}] master={data.MasterVolume:P0} muted={data.Muted} channels={data.Channels}");
+                $"[endpoint: {device.Name}] master={data.MasterVolume:P0} muted={data.Muted} channels={data.Channels}, ctx: {data.EventContext}");
         endpointVolume.OnVolumeNotification += endpointHandler;
 
         // 3) Device (endpoint) change events, incl. default / default-communications device changes.

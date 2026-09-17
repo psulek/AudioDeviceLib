@@ -1,4 +1,4 @@
-﻿/*
+/*
   LICENSE
   -------
   Copyright (C) 2007-2010 Ray Molenkamp
@@ -44,7 +44,7 @@ namespace AudioDeviceLib.CoreAudioApi.Interfaces;
 
 [Guid("bfb7ff88-7239-4fc9-8fa2-07c950be9c6d"),
  InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-interface IAudioSessionControl2
+internal unsafe interface IAudioSessionControl2
 {
     //IAudioSession functions
     [PreserveSig]
@@ -54,19 +54,20 @@ interface IAudioSessionControl2
     int GetDisplayName(out IntPtr name);
 
     [PreserveSig]
-    int SetDisplayName(string value, Guid EventContext);
+    int SetDisplayName([MarshalAs(UnmanagedType.LPWStr)]string value, Guid* EventContext);
+    // int SetDisplayName(string value, ref Guid EventContext);
 
     [PreserveSig]
     int GetIconPath(out IntPtr Path);
 
     [PreserveSig]
-    int SetIconPath(string Value, Guid EventContext);
+    int SetIconPath(string Value, ref Guid EventContext);
 
     [PreserveSig]
     int GetGroupingParam(out Guid GroupingParam);
 
     [PreserveSig]
-    int SetGroupingParam(Guid Override, Guid Eventcontext);
+    int SetGroupingParam(ref Guid Override, ref Guid Eventcontext);
 
     [PreserveSig]
     int RegisterAudioSessionNotification(IAudioSessionEventsCOM NewNotifications);

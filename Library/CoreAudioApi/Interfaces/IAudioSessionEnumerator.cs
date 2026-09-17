@@ -1,4 +1,4 @@
-﻿/*
+/*
   LICENSE
   -------
   Copyright (C) 2007-2010 Ray Molenkamp
@@ -42,6 +42,8 @@ namespace AudioDeviceLib.CoreAudioApi.Interfaces;
  InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 internal interface IAudioSessionEnumerator
 {
+    [PreserveSig]
     int GetCount(out int SessionCount);
+    [PreserveSig]
     int GetSession(int SessionCount, out IAudioSessionControl2 Session);
 }

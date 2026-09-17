@@ -72,11 +72,7 @@ internal class AudioEndpointVolumeCallback : IAudioEndpointVolumeCallback
 
         float[] voldata = new float[data.nChannels];
 
-        //Read all floats from memory.
-        for (int i = 0; i < data.nChannels; i++)
-        {
-            voldata[i] = (float)Marshal.PtrToStructure(FirstFloatPtr, typeof(float));
-        }
+        Marshal.Copy(FirstFloatPtr, voldata, 0, voldata.Length);
 
         //Create combined structure and Fire Event in parent class.
         AudioVolumeNotificationData NotificationData =

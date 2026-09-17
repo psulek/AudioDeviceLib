@@ -88,8 +88,6 @@ public sealed class AudioController : IDisposable
         }
     }
 
-    // Created on first use. Setting a default by ID goes through IPolicyConfig only and never needs
-    // an enumerator, so eager creation made that path pay for a CoCreateInstance it did not use.
     private IMMDeviceEnumerator _realEnumerator;
 
     // Maps each registered consumer to its registration entry (the COM adapter plus the cached
@@ -884,11 +882,11 @@ public sealed class AudioController : IDisposable
 
             adapter = new MMNotificationClientComAdapter(consumer);
             token = new DeviceEventsRegistration(this, adapter);
+            // Serialize native registration with disposal; publish only after success.
+            Marshal.ThrowExceptionForHR(Enumerator.RegisterEndpointNotificationCallback(adapter));
             _deviceRegistrations[consumer] = new DeviceRegistration(adapter, token);
+            return token;
         }
-
-        Marshal.ThrowExceptionForHR(Enumerator.RegisterEndpointNotificationCallback(adapter));
-        return token;
     }
 
     // Called by a registration token to undo exactly one registration. Idempotent: a no-op if the
@@ -908,10 +906,9 @@ public sealed class AudioController : IDisposable
                 return;
             }
 
+            Marshal.ThrowExceptionForHR(Enumerator.UnregisterEndpointNotificationCallback(adapter));
             _deviceRegistrations.Remove(adapter.Target);
         }
-
-        Marshal.ThrowExceptionForHR(Enumerator.UnregisterEndpointNotificationCallback(adapter));
     }
 
     /// <summary>

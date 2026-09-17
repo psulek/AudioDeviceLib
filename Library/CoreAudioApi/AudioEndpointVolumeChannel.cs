@@ -35,8 +35,8 @@
     documentation comments.
 */
 
-using System;
 using System.Runtime.InteropServices;
+using AudioDeviceLib.CoreAudioApi.Extensions;
 using AudioDeviceLib.CoreAudioApi.Interfaces;
 
 namespace AudioDeviceLib.CoreAudioApi;
@@ -62,7 +62,8 @@ public class AudioEndpointVolumeChannel
             Marshal.ThrowExceptionForHR(_AudioEndpointVolume.GetChannelVolumeLevel(_Channel, out var result));
             return result;
         }
-        set => Marshal.ThrowExceptionForHR(_AudioEndpointVolume.SetChannelVolumeLevel(_Channel, value, Guid.Empty));
+        //set => Marshal.ThrowExceptionForHR(_AudioEndpointVolume.SetChannelVolumeLevel(_Channel, value));
+        set => Marshal.ThrowExceptionForHR(_AudioEndpointVolume.SetChannelVolumeLevel(_Channel, value));
     }
 
     /// <summary>Gets or sets this channel's volume as a normalized scalar in the range 0.0 to 1.0.</summary>
@@ -75,6 +76,6 @@ public class AudioEndpointVolumeChannel
             return result;
         }
         set => Marshal.ThrowExceptionForHR(
-            _AudioEndpointVolume.SetChannelVolumeLevelScalar(_Channel, value, Guid.Empty));
+            _AudioEndpointVolume.SetChannelVolumeLevelScalar(_Channel, value));
     }
 }

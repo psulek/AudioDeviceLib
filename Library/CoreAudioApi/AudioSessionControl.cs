@@ -199,11 +199,11 @@ public class AudioSessionControl : IDisposable
 
             adapter = new AudioSessionEventsComAdapter(this, eventConsumer);
             token = new SessionEventsRegistration(this, adapter);
+            // Serialize native registration with disposal; publish only after success.
+            Marshal.ThrowExceptionForHR(_AudioSessionControl.RegisterAudioSessionNotification(adapter));
             _registrations[eventConsumer] = new Registration(adapter, token);
+            return token;
         }
-
-        Marshal.ThrowExceptionForHR(_AudioSessionControl.RegisterAudioSessionNotification(adapter));
-        return token;
     }
 
     /// <summary>Unregisters a previously registered session change callback.</summary>
@@ -227,10 +227,9 @@ public class AudioSessionControl : IDisposable
             }
 
             adapter = existing.Adapter;
+            Marshal.ThrowExceptionForHR(_AudioSessionControl.UnregisterAudioSessionNotification(adapter));
             _registrations.Remove(eventConsumer);
         }
-
-        Marshal.ThrowExceptionForHR(_AudioSessionControl.UnregisterAudioSessionNotification(adapter));
     }
 
     // Called by a registration token to undo exactly one registration. Idempotent: a no-op if the
@@ -249,10 +248,9 @@ public class AudioSessionControl : IDisposable
                 return;
             }
 
+            Marshal.ThrowExceptionForHR(_AudioSessionControl.UnregisterAudioSessionNotification(adapter));
             _registrations.Remove(adapter.Target);
         }
-
-        Marshal.ThrowExceptionForHR(_AudioSessionControl.UnregisterAudioSessionNotification(adapter));
     }
 
     /// <summary>Unregisters any remaining session-event callbacks registered on this session.</summary>

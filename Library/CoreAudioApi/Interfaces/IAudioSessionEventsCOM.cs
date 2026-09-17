@@ -1,4 +1,4 @@
-﻿/*
+/*
   LICENSE
   -------
   Copyright (C) 2007-2010 Ray Molenkamp
@@ -52,20 +52,20 @@ namespace AudioDeviceLib.CoreAudioApi.Interfaces;
 internal interface IAudioSessionEventsCOM
 {
     [PreserveSig]
-    int OnDisplayNameChanged([MarshalAs(UnmanagedType.LPWStr)] string NewDisplayName, Guid EventContext);
+    int OnDisplayNameChanged([MarshalAs(UnmanagedType.LPWStr)] string NewDisplayName, ref Guid EventContext);
 
     [PreserveSig]
-    int OnIconPathChanged([MarshalAs(UnmanagedType.LPWStr)] string NewIconPath, Guid EventContext);
+    int OnIconPathChanged([MarshalAs(UnmanagedType.LPWStr)] string NewIconPath, ref Guid EventContext);
 
     [PreserveSig]
-    int OnSimpleVolumeChanged(float NewVolume, bool newMute, Guid EventContext);
+    int OnSimpleVolumeChanged(float NewVolume, bool newMute, ref Guid EventContext);
 
     [PreserveSig]
     int OnChannelVolumeChanged(UInt32 ChannelCount, IntPtr NewChannelVolumeArray, UInt32 ChangedChannel,
-        Guid EventContext);
+        ref Guid EventContext);
 
     [PreserveSig]
-    int OnGroupingParamChanged(Guid NewGroupingParam, Guid EventContext);
+    int OnGroupingParamChanged(ref Guid NewGroupingParam, ref Guid EventContext);
 
     [PreserveSig]
     int OnStateChanged(AudioSessionState NewState);
