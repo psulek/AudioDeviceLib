@@ -41,15 +41,17 @@
 using System;
 using System.Runtime.InteropServices;
 using AudioDeviceLib.CoreAudioApi.Interfaces;
+using JetBrains.Annotations;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
 /// <summary>
 /// Property Store class, only supports reading properties at the moment.
 /// </summary>
+[PublicAPI]
 public class PropertyStore
 {
-    private IPropertyStore _Store;
+    private IPropertyStore _store;
 
     /// <summary>Gets the number of properties in the store.</summary>
     /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
@@ -57,8 +59,8 @@ public class PropertyStore
     {
         get
         {
-            Marshal.ThrowExceptionForHR(_Store.GetCount(out var Result));
-            return Result;
+            Marshal.ThrowExceptionForHR(_store.GetCount(out var result));
+            return result;
         }
     }
 
@@ -71,8 +73,8 @@ public class PropertyStore
         get
         {
             PropertyKey key = Get(index);
-            Marshal.ThrowExceptionForHR(_Store.GetValue(ref key, out PropVariant result));
-            return new PropertyStoreProperty(key, result);
+            Marshal.ThrowExceptionForHR(_store.GetValue(ref key, out var result));
+            return new PropertyStoreProperty(key, result.ToPropertyValue());
         }
     }
 
@@ -108,8 +110,8 @@ public class PropertyStore
                 PropertyKey key = Get(i);
                 if (key.fmtid == guid)
                 {
-                    Marshal.ThrowExceptionForHR(_Store.GetValue(ref key, out PropVariant result));
-                    return new PropertyStoreProperty(key, result);
+                    Marshal.ThrowExceptionForHR(_store.GetValue(ref key, out var result));
+                    return new PropertyStoreProperty(key, result.ToPropertyValue());
                 }
             }
 
@@ -123,7 +125,7 @@ public class PropertyStore
     /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
     public PropertyKey Get(int index)
     {
-        Marshal.ThrowExceptionForHR(_Store.GetAt(index, out PropertyKey key));
+        Marshal.ThrowExceptionForHR(_store.GetAt(index, out PropertyKey key));
         return key;
     }
 
@@ -132,11 +134,11 @@ public class PropertyStore
     /// <returns>The <see cref="PropVariant"/> value at the requested position.</returns>
     /// <remarks>The returned value owns native memory. Call <see cref="PropVariant.Clear"/> on it when done.</remarks>
     /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
-    public PropVariant GetValue(int index)
+    public PropertyValue GetValue(int index)
     {
         PropertyKey key = Get(index);
-        Marshal.ThrowExceptionForHR(_Store.GetValue(ref key, out PropVariant result));
-        return result;
+        Marshal.ThrowExceptionForHR(_store.GetValue(ref key, out var result));
+        return result.ToPropertyValue();
     }
 
     /// <summary>Determines whether the store contains a property matching the given key exactly.</summary>
@@ -144,19 +146,9 @@ public class PropertyStore
     /// <returns><c>true</c> if a matching property exists; otherwise <c>false</c>.</returns>
     public bool Contains(PropertyKey compareKey)
     {
-        int count = Count;
-        for (int i = 0; i < count; i++)
-        {
-            PropertyKey key = Get(i);
-            if (key.fmtid == compareKey.fmtid && key.pid == compareKey.pid)
-            {
-                return true;
-            }
-        }
-
-        return false;
+        return TryGetValue(compareKey, out _);
     }
-
+    
     /// <summary>Gets the property that matches the given key exactly.</summary>
     /// <param name="queryKey">The property key (set GUID and property id) to look up.</param>
     /// <returns>The matching <see cref="PropertyStoreProperty"/>, or <c>null</c> if none is found.</returns>
@@ -165,18 +157,8 @@ public class PropertyStore
     {
         get
         {
-            int count = Count;
-            for (int i = 0; i < count; i++)
-            {
-                PropertyKey key = Get(i);
-                if (key.fmtid == queryKey.fmtid && key.pid == queryKey.pid)
-                {
-                    Marshal.ThrowExceptionForHR(_Store.GetValue(ref key, out PropVariant result));
-                    return new PropertyStoreProperty(key, result);
-                }
-            }
-
-            return null;
+            if (!TryGetValue(queryKey, out var value)) { return null; }
+            return new PropertyStoreProperty(queryKey, value);
         }
     }
 
@@ -185,23 +167,46 @@ public class PropertyStore
     /// <param name="value">The value read, or an empty variant when the key is not present.</param>
     /// <returns><c>true</c> if the store holds a value for <paramref name="key"/>; otherwise <c>false</c>.</returns>
     /// <remarks>The returned value owns native memory. Call <see cref="PropVariant.Clear"/> on it when done.</remarks>
-    public bool TryGetValue(PropertyKey key, out PropVariant value)
+    public bool TryGetValue(PropertyKey key, out PropertyValue value)
     {
         // IPropertyStore::GetValue takes the key directly, so this is one COM call where the
         // indexers walk the whole store. It also does NOT fail for a missing key: it returns S_OK
         // with a VT_EMPTY variant, which is why the emptiness check below is the real "found" test.
-        int hr = _Store.GetValue(ref key, out value);
+        int hr = _store.GetValue(ref key, out var propValue);
         if (hr != 0)
         {
-            value = default(PropVariant);
+            value = new PropertyValue(VarEnum.VT_EMPTY, null);
             return false;
         }
 
+        try
+        {
+            value = propValue.ToPropertyValue();
+        }
+        finally
+        {
+            // free the native memory, since we copied the value into a managed struct
+            //propValue.Clear();
+        }
         return !value.IsEmpty;
     }
+    // public bool TryGetValue(PropertyKey key, out PropVariant value)
+    // {
+    //     // IPropertyStore::GetValue takes the key directly, so this is one COM call where the
+    //     // indexers walk the whole store. It also does NOT fail for a missing key: it returns S_OK
+    //     // with a VT_EMPTY variant, which is why the emptiness check below is the real "found" test.
+    //     int hr = _Store.GetValue(ref key, out value);
+    //     if (hr != 0)
+    //     {
+    //         value = default(PropVariant);
+    //         return false;
+    //     }
+    //
+    //     return !value.IsEmpty;
+    // }
 
     internal PropertyStore(IPropertyStore store)
     {
-        _Store = store;
+        _store = store;
     }
 }

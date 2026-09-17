@@ -61,7 +61,7 @@ namespace AudioDeviceLib.CoreAudioApi;
 
 /// <summary>Managed layout of the native <c>PROPVARIANT</c> used to read values from a property store.</summary>
 [StructLayout(LayoutKind.Explicit)]
-public struct PropVariant
+internal struct PropVariant
 {
     [FieldOffset(0)] short vt;
     [FieldOffset(2)] short wReserved1;
@@ -121,15 +121,24 @@ public struct PropVariant
     }
 
     /// <summary>Gets the variant type tag of this value.</summary>
-    public VarEnum VarType
-    {
-        get { return (VarEnum)vt; }
-    }
+    public VarEnum VarType => (VarEnum)vt;
 
     /// <summary>Gets whether this variant carries no value.</summary>
-    public bool IsEmpty
+    public bool IsEmpty => vt == (short)VarEnum.VT_EMPTY || vt == (short)VarEnum.VT_NULL;
+
+    public PropertyValue ToPropertyValue()
     {
-        get { return vt == (short)VarEnum.VT_EMPTY || vt == (short)VarEnum.VT_NULL; }
+        object val;
+        var varType = VarType;
+        try
+        {
+            val = Value;
+        }
+        finally
+        {
+            Clear();
+        }
+        return new PropertyValue(varType, val);
     }
 
     /// <summary>Gets the variant value converted to a managed object based on its variant type.</summary>
@@ -190,7 +199,6 @@ public struct PropVariant
                 // being turned into an exception - this is a value being read, not a call failing.
                 case VarEnum.VT_ERROR:
                     return scode;
-
                 case VarEnum.VT_LPWSTR:
                     return Marshal.PtrToStringUni(everything_else);
                 case VarEnum.VT_BLOB:

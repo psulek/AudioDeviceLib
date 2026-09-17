@@ -37,28 +37,31 @@
     the variant and leaving its native payload to leak.
 */
 
+using JetBrains.Annotations;
+
 namespace AudioDeviceLib.CoreAudioApi;
 
 /// <summary>A single key/value entry read from a Core Audio <see cref="PropertyStore"/>.</summary>
+[PublicAPI]
 public class PropertyStoreProperty
 {
-    private PropertyKey _PropertyKey;
-    private object _Value;
+  //private object _Value;
 
-    internal PropertyStoreProperty(PropertyKey key, PropVariant value)
+    internal PropertyStoreProperty(PropertyKey key, PropertyValue value)
     {
-        _PropertyKey = key;
-
-        // Read the value out and release the variant here. PropVariant.Value copies strings and
-        // blobs into managed memory, so nothing is lost by clearing immediately - and without it
-        // every property read through a PropertyStore indexer leaks its payload.
-        _Value = value.Value;
-        value.Clear();
+        Key = key;
+        Value = value;
     }
+    // internal PropertyStoreProperty(PropertyKey key, PropVariant value)
+    // {
+    //     _PropertyKey = key;
+    //     _Value = value.Value;
+    //     value.Clear();
+    // }
 
     /// <summary>Gets the key that identifies this property.</summary>
-    public PropertyKey Key => _PropertyKey;
+    public PropertyKey Key { get; }
 
     /// <summary>Gets the property value, converted to a managed type where supported.</summary>
-    public object Value => _Value;
+    public PropertyValue Value { get; }
 }
