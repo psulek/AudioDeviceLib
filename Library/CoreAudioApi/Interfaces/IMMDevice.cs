@@ -1,4 +1,4 @@
-/*
+﻿/*
   LICENSE
   -------
   Copyright (C) 2007-2010 Ray Molenkamp
@@ -28,11 +28,8 @@
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi.Interfaces` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax).
-  - `EStgmAccess`/`EDeviceState` renamed to `StgmAccess`/`DeviceState`.
+  The changes are summarised in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 using System;
@@ -40,6 +37,7 @@ using System.Runtime.InteropServices;
 
 namespace AudioDeviceLib.CoreAudioApi.Interfaces;
 
+// MDN: https://learn.microsoft.com/en-us/windows/win32/api/mmdeviceapi/nn-mmdeviceapi-immdevice
 [Guid("D666063F-1587-4E43-81F1-B948E807363F"),
  InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
 internal interface IMMDevice
@@ -49,7 +47,7 @@ internal interface IMMDevice
         [MarshalAs(UnmanagedType.IUnknown)] out object ppInterface);
 
     [PreserveSig]
-    int OpenPropertyStore(StgmAccess stgmAccess, out IPropertyStore propertyStore);
+    int OpenPropertyStore(StgmAccess stgmAccess, [MarshalAs(UnmanagedType.Interface)] out IPropertyStore propertyStore);
 
     [PreserveSig]
     int GetId([MarshalAs(UnmanagedType.LPWStr)] out string ppstrId);

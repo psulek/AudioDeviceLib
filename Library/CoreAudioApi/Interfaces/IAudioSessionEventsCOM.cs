@@ -1,4 +1,4 @@
-/*
+﻿/*
   LICENSE
   -------
   Copyright (C) 2007-2010 Ray Molenkamp
@@ -29,13 +29,8 @@
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
   Derived from `SOURCE/IAudioSessionEvents.cs` upstream.
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi.Interfaces` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax).
-  - Renamed from `IAudioSessionEvents.cs` / `IAudioSessionEvents` to `IAudioSessionEventsCOM` and
-    changed from `public` to `internal`; it is now the raw COM sink behind the library's own
-    pure-C# `IAudioSessionEvents`.
+  The changes are summarised in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 using System;
@@ -49,23 +44,36 @@ namespace AudioDeviceLib.CoreAudioApi.Interfaces;
 // instead; AudioSessionEventsComAdapter bridges the two.
 [Guid("24918ACC-64B3-37C1-8CA9-74A66E9957A8"),
  InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-internal interface IAudioSessionEventsCOM
+internal unsafe interface IAudioSessionEventsCOM
 {
+    // `EventContext` is a raw pointer rather than `ref Guid` because Core Audio really does pass
+    // NULL here: "If the caller supplies a NULL pointer for this parameter, the client's
+    // notification method receives a NULL context pointer" (IAudioSessionControl::SetDisplayName,
+    // ISimpleAudioVolume::SetMasterVolume, and the other session setters). A `ref Guid` would be
+    // dereferenced unconditionally by the implementing sink, which is an access violation.
+    //
+    // This is the opposite of IAudioEndpointVolume, where the docs guarantee that a NULL context
+    // reaches subscribers as GUID_NULL - there `ref Guid` is lossless. The two families differ
+    // because the endpoint notification carries the GUID by value and the session one by pointer.
     [PreserveSig]
-    int OnDisplayNameChanged([MarshalAs(UnmanagedType.LPWStr)] string NewDisplayName, ref Guid EventContext);
+    int OnDisplayNameChanged([MarshalAs(UnmanagedType.LPWStr)] string NewDisplayName, Guid* EventContext);
 
     [PreserveSig]
-    int OnIconPathChanged([MarshalAs(UnmanagedType.LPWStr)] string NewIconPath, ref Guid EventContext);
+    int OnIconPathChanged([MarshalAs(UnmanagedType.LPWStr)] string NewIconPath, Guid* EventContext);
 
     [PreserveSig]
-    int OnSimpleVolumeChanged(float NewVolume, bool newMute, ref Guid EventContext);
+    int OnSimpleVolumeChanged(float NewVolume, int newMute, Guid* EventContext);
 
     [PreserveSig]
     int OnChannelVolumeChanged(UInt32 ChannelCount, IntPtr NewChannelVolumeArray, UInt32 ChangedChannel,
-        ref Guid EventContext);
+        Guid* EventContext);
 
+    // `NewGroupingParam` is a pointer defensively rather than on documented grounds: the docs are
+    // silent on whether the system can raise this with NULL, and only constrain clients calling
+    // SetGroupingParam ("must be a valid, non-NULL pointer"). A null check costs a branch; guessing
+    // wrong costs an uncatchable access violation on a Core Audio thread.
     [PreserveSig]
-    int OnGroupingParamChanged(ref Guid NewGroupingParam, ref Guid EventContext);
+    int OnGroupingParamChanged(Guid* NewGroupingParam, Guid* EventContext);
 
     [PreserveSig]
     int OnStateChanged(AudioSessionState NewState);

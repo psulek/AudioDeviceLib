@@ -35,7 +35,7 @@ jobs:
       # An explicit project path, never a forward-slash glob: `dotnet` does not expand those on a
       # Windows runner (see the Push step below for the same lesson).
       - name: Test
-        run: dotnet test Library.UnitTests/Library.UnitTests.csproj -c Release --logger "trx;LogFileName=test-results.trx" --results-directory test-results
+        run: dotnet test Library.UnitTests/Library.UnitTests.csproj -c Release -m:1 --logger "trx;LogFileName=test-results.trx" --results-directory test-results
 
       - name: Upload test results
         if: always()

@@ -1,4 +1,4 @@
-/*
+﻿/*
   LICENSE
   -------
   Copyright (C) 2007-2010 Ray Molenkamp
@@ -28,18 +28,8 @@
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
 
-  Changes from the original:
-  - `MMDevice` and the AudioDeviceCmdlets-derived `AudioDevice` were merged into this single type,
-    which now holds the `IMMDevice` directly. `CoreAudioApi/MMDevice.cs` no longer exists.
-  - Namespace changed to `AudioDeviceLib.Lib` (file-scoped); unused `using` directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
-    documentation comments.
-  - Implements `IDisposable` with a `_disposed` flag and a `ThrowIfDisposed()` guard.
-  - `FriendlyName`/`ID`/`DataFlow`/`State` became the snapshot properties `Name`/`Id`/`Kind`/`State`,
-    captured once at construction rather than re-read from COM on every access.
-  - `AudioEndpointVolume`/`AudioSessionManager`/`AudioMeterInformation` exposed as
-    `Volume`/`SessionManager`/`Meter`.
-  - `EStgmAccess`/`EDataFlow`/`EDeviceState` renamed to `StgmAccess`/`DataFlow`/`DeviceState`.
+  The changes are summarised in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 /*
@@ -68,29 +58,31 @@ namespace AudioDeviceLib.Lib;
 /// <remarks>
 /// <para>
 /// Identity (<see cref="Id"/>, <see cref="Name"/>, <see cref="Kind"/>) and <see cref="State"/> are
-/// captured when the instance is created and cost nothing to read afterwards. Call
-/// <see cref="Refresh"/> to re-read them, or register for change notifications with
+/// captured when the instance is created and cost nothing to read afterward. Call
+/// <see cref="Refresh"/> to re-read them or register for change notifications with
 /// <see cref="AudioController.RegisterDeviceNotification"/>.
 /// </para>
 /// <para>
 /// Dispose an instance once you are done with it. That tears down any endpoint-volume or session
-/// callbacks it activated; the identity snapshot stays readable afterwards, but every other member
+/// callbacks it activated; the identity snapshot stays readable afterward, but every other member
 /// throws <see cref="ObjectDisposedException"/>.
 /// </para>
 /// </remarks>
 [PublicAPI]
 public sealed class AudioDevice : IDisposable
 {
+    // ReSharper disable InconsistentNaming
     private static Guid IID_IAudioMeterInformation = typeof(IAudioMeterInformation).GUID;
     private static Guid IID_IAudioEndpointVolume = typeof(IAudioEndpointVolume).GUID;
     private static Guid IID_IAudioSessionManager = typeof(IAudioSessionManager2).GUID;
+    // ReSharper restore InconsistentNaming
 
     private readonly IMMDevice _realDevice;
 
-    private PropertyStore _propertyStore;
-    private AudioMeterInformation _meter;
-    private AudioEndpointVolume _volume;
-    private AudioSessionManager _sessionManager;
+    private PropertyStore? _propertyStore;
+    private AudioMeterInformation? _meter;
+    private AudioEndpointVolume? _volume;
+    private AudioSessionManager? _sessionManager;
 
     private bool _disposed;
 
@@ -117,12 +109,7 @@ public sealed class AudioDevice : IDisposable
 
     internal AudioDevice(IMMDevice realDevice, bool isDefault, bool isDefaultCommunication)
     {
-        if (realDevice == null)
-        {
-            throw new ArgumentNullException(nameof(realDevice));
-        }
-
-        _realDevice = realDevice;
+        _realDevice = realDevice ?? throw new ArgumentNullException(nameof(realDevice));
         IsDefault = isDefault;
         IsDefaultCommunication = isDefaultCommunication;
 
@@ -133,7 +120,7 @@ public sealed class AudioDevice : IDisposable
     }
 
     /// <summary>Gets the volume and mute control for this endpoint (activated on first access).</summary>
-    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed of.</exception>
     /// <exception cref="COMException">Thrown when the interface cannot be activated.</exception>
     public AudioEndpointVolume Volume
     {
@@ -144,7 +131,7 @@ public sealed class AudioDevice : IDisposable
             {
                 Marshal.ThrowExceptionForHR(_realDevice.Activate(ref IID_IAudioEndpointVolume, CLSCTX.ALL,
                     IntPtr.Zero, out var result));
-                _volume = new AudioEndpointVolume(result as IAudioEndpointVolume);
+                _volume = new AudioEndpointVolume((result as IAudioEndpointVolume)!);
             }
 
             return _volume;
@@ -152,7 +139,7 @@ public sealed class AudioDevice : IDisposable
     }
 
     /// <summary>Gets the audio session manager for this endpoint (activated on first access).</summary>
-    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed of.</exception>
     /// <exception cref="COMException">Thrown when the interface cannot be activated.</exception>
     public AudioSessionManager SessionManager
     {
@@ -163,7 +150,7 @@ public sealed class AudioDevice : IDisposable
             {
                 Marshal.ThrowExceptionForHR(_realDevice.Activate(ref IID_IAudioSessionManager, CLSCTX.ALL,
                     IntPtr.Zero, out var result));
-                _sessionManager = new AudioSessionManager(result as IAudioSessionManager2);
+                _sessionManager = new AudioSessionManager((result as IAudioSessionManager2)!);
             }
 
             return _sessionManager;
@@ -171,7 +158,7 @@ public sealed class AudioDevice : IDisposable
     }
 
     /// <summary>Gets the peak-meter information for this endpoint (activated on first access).</summary>
-    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed of.</exception>
     /// <exception cref="COMException">Thrown when the interface cannot be activated.</exception>
     public AudioMeterInformation Meter
     {
@@ -182,7 +169,7 @@ public sealed class AudioDevice : IDisposable
             {
                 Marshal.ThrowExceptionForHR(_realDevice.Activate(ref IID_IAudioMeterInformation, CLSCTX.ALL,
                     IntPtr.Zero, out var result));
-                _meter = new AudioMeterInformation(result as IAudioMeterInformation);
+                _meter = new AudioMeterInformation((result as IAudioMeterInformation)!);
             }
 
             return _meter;
@@ -190,7 +177,7 @@ public sealed class AudioDevice : IDisposable
     }
 
     /// <summary>Gets the property store for this endpoint (opened on first access).</summary>
-    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed of.</exception>
     /// <exception cref="COMException">Thrown when the property store cannot be opened.</exception>
     public PropertyStore Properties
     {
@@ -202,7 +189,7 @@ public sealed class AudioDevice : IDisposable
     }
 
     /// <summary>Re-reads <see cref="Name"/> and <see cref="State"/> from the endpoint.</summary>
-    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed of.</exception>
     /// <exception cref="COMException">Thrown when the underlying Core Audio call fails.</exception>
     public void Refresh()
     {
@@ -220,7 +207,7 @@ public sealed class AudioDevice : IDisposable
 
     /// <summary>Master volume as a percentage in the range 0..100.</summary>
     /// <returns>The current master volume scalar expressed as a percentage between 0 and 100.</returns>
-    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed of.</exception>
     public float GetVolumePercent()
     {
         return Volume.MasterVolumeLevelScalar * 100f;
@@ -228,10 +215,10 @@ public sealed class AudioDevice : IDisposable
 
     /// <summary>Sets master volume from a percentage in the range 0..100 (values are clamped).</summary>
     /// <param name="percent">
-    /// The desired master volume as a percentage. Values below 0 are clamped to 0 and values above
+    /// The desired master volume as a percentage. Values below 0 are clamped to 0, and values above
     /// 100 are clamped to 100.
     /// </param>
-    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed of.</exception>
     public void SetVolumePercent(float percent)
     {
         if (percent < 0f)
@@ -248,7 +235,7 @@ public sealed class AudioDevice : IDisposable
     }
 
     /// <summary>Gets or sets the mute state of the endpoint.</summary>
-    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed of.</exception>
     public bool IsMuted
     {
         get => Volume.Mute;
@@ -257,7 +244,7 @@ public sealed class AudioDevice : IDisposable
 
     /// <summary>Inverts the current mute state.</summary>
     /// <returns>The mute state after the change.</returns>
-    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed of.</exception>
     public bool ToggleMute()
     {
         AudioEndpointVolume volume = Volume;
@@ -268,7 +255,7 @@ public sealed class AudioDevice : IDisposable
 
     /// <summary>Instantaneous master peak level in the range 0..1 (0 when silent).</summary>
     /// <returns>The current master peak meter value between 0 (silent) and 1 (full scale).</returns>
-    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed of.</exception>
     public float GetPeakValue()
     {
         return Meter.MasterPeakValue;
@@ -277,7 +264,7 @@ public sealed class AudioDevice : IDisposable
     /// <summary>Determines whether the given object is the same endpoint, compared by <see cref="Id"/>.</summary>
     /// <param name="obj">The object to compare with.</param>
     /// <returns><c>true</c> if <paramref name="obj"/> is an <see cref="AudioDevice"/> with the same ID.</returns>
-    public override bool Equals(object obj)
+    public override bool Equals(object? obj)
     {
         // Two wrappers for one endpoint are never reference-equal: Core Audio hands out a distinct
         // COM object per acquisition, so identity has to come from the endpoint ID.
@@ -289,7 +276,7 @@ public sealed class AudioDevice : IDisposable
     /// <returns>A hash code for this endpoint.</returns>
     public override int GetHashCode()
     {
-        return Id == null ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(Id);
+        return StringComparer.OrdinalIgnoreCase.GetHashCode(Id);
     }
 
     /// <summary>Returns a human-readable description of this endpoint.</summary>
@@ -364,13 +351,15 @@ public sealed class AudioDevice : IDisposable
 
     private DataFlow ReadDataFlow()
     {
+        // ReSharper disable once SuspiciousTypeConversion.Global
+        // This cast is safe: the endpoint is get by doing QueryInterface for IMMEndpoint  
         var endpoint = _realDevice as IMMEndpoint;
         if (endpoint == null)
         {
             throw new InvalidOperationException("The endpoint does not implement IMMEndpoint.");
         }
 
-        endpoint.GetDataFlow(out var result);
+        Marshal.ThrowExceptionForHR(endpoint.GetDataFlow(out var result));
         return result;
     }
 

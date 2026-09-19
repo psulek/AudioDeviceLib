@@ -1,4 +1,4 @@
-/*
+﻿/*
   Copyright (c) 2026 Peter Šulek
   MIT License
 
@@ -38,39 +38,44 @@ public interface IAudioSessionEvents
     /// <summary>Called when the session display name changes.</summary>
     /// <param name="session">Immutable snapshot identifying the session that raised the notification.</param>
     /// <param name="newDisplayName">The new display name.</param>
-    /// <param name="eventContext">The context GUID of the caller that made the change.</param>
+    /// <param name="eventContext">The context GUID supplied by the caller that made the change,
+    /// or <see langword="null"/> if that caller supplied none.</param>
     /// <remarks>Called on an arbitrary, non-UI thread.</remarks>
-    void OnDisplayNameChanged(AudioSessionInfo session, string newDisplayName, Guid eventContext);
+    void OnDisplayNameChanged(AudioSessionInfo session, string newDisplayName, Guid? eventContext);
 
     /// <summary>Called when the session icon path changes.</summary>
     /// <param name="session">Immutable snapshot identifying the session that raised the notification.</param>
     /// <param name="newIconPath">The new icon path.</param>
-    /// <param name="eventContext">The context GUID of the caller that made the change.</param>
+    /// <param name="eventContext">The context GUID supplied by the caller that made the change,
+    /// or <see langword="null"/> if that caller supplied none.</param>
     /// <remarks>Called on an arbitrary, non-UI thread.</remarks>
-    void OnIconPathChanged(AudioSessionInfo session, string newIconPath, Guid eventContext);
+    void OnIconPathChanged(AudioSessionInfo session, string newIconPath, Guid? eventContext);
 
     /// <summary>Called when the session master volume or mute state changes.</summary>
     /// <param name="session">Immutable snapshot identifying the session that raised the notification.</param>
     /// <param name="newVolume">The new master volume scalar in the range 0.0 to 1.0.</param>
     /// <param name="newMute">The new mute state.</param>
-    /// <param name="eventContext">The context GUID of the caller that made the change.</param>
+    /// <param name="eventContext">The context GUID supplied by the caller that made the change,
+    /// or <see langword="null"/> if that caller supplied none.</param>
     /// <remarks>Called on an arbitrary, non-UI thread.</remarks>
-    void OnSimpleVolumeChanged(AudioSessionInfo session, float newVolume, bool newMute, Guid eventContext);
+    void OnSimpleVolumeChanged(AudioSessionInfo session, float newVolume, bool newMute, Guid? eventContext);
 
     /// <summary>Called when one or more per-channel volumes change.</summary>
     /// <param name="session">Immutable snapshot identifying the session that raised the notification.</param>
     /// <param name="newChannelVolumes">The new per-channel volume scalars (one entry per channel).</param>
     /// <param name="changedChannel">The index of the channel that changed, or 0xFFFFFFFF if multiple changed.</param>
-    /// <param name="eventContext">The context GUID of the caller that made the change.</param>
+    /// <param name="eventContext">The context GUID supplied by the caller that made the change,
+    /// or <see langword="null"/> if that caller supplied none.</param>
     /// <remarks>Called on an arbitrary, non-UI thread.</remarks>
-    void OnChannelVolumeChanged(AudioSessionInfo session, float[] newChannelVolumes, uint changedChannel, Guid eventContext);
+    void OnChannelVolumeChanged(AudioSessionInfo session, float[] newChannelVolumes, uint changedChannel, Guid? eventContext);
 
     /// <summary>Called when the session grouping parameter changes.</summary>
     /// <param name="session">Immutable snapshot identifying the session that raised the notification.</param>
     /// <param name="newGroupingParam">The new grouping parameter GUID.</param>
-    /// <param name="eventContext">The context GUID of the caller that made the change.</param>
+    /// <param name="eventContext">The context GUID supplied by the caller that made the change,
+    /// or <see langword="null"/> if that caller supplied none.</param>
     /// <remarks>Called on an arbitrary, non-UI thread.</remarks>
-    void OnGroupingParamChanged(AudioSessionInfo session, Guid newGroupingParam, Guid eventContext);
+    void OnGroupingParamChanged(AudioSessionInfo session, Guid newGroupingParam, Guid? eventContext);
 
     /// <summary>Called when the session activity state changes.</summary>
     /// <param name="session">Immutable snapshot identifying the session that raised the notification.</param>

@@ -1,4 +1,4 @@
-/*
+﻿/*
   LICENSE
   -------
   Copyright (C) 2007-2010 Ray Molenkamp
@@ -29,13 +29,8 @@
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
 
-  Changes from the original:
-  - The `MMDeviceEnumerator` wrapper class was folded into `AudioController` as private helpers;
-    `CoreAudioApi/MMDeviceEnumerator.cs` no longer exists.
-  - The helpers return the raw `IMMDevice` rather than a wrapper, leaving `AudioController` as the
-    only place that constructs an `AudioDevice`.
-  - The `IMMDeviceEnumerator` is created lazily, so paths that never enumerate (for example setting
-    a default by ID, which only needs `IPolicyConfig`) no longer CoCreate one.
+  The changes are summarised in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 /*

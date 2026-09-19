@@ -1,4 +1,4 @@
-/*
+﻿/*
   LICENSE
   -------
   Copyright (C) 2007-2010 Ray Molenkamp
@@ -29,16 +29,8 @@
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
   Derived from `SOURCE/EDataFlow.cs` upstream.
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
-    documentation comments.
-  - Split out of the original `EDataFlow`: this is the query-side half, used only to select which
-    endpoints an enumeration returns. It keeps the `eAll` sentinel (renamed `All`); the state-side
-    half is `DataFlow`, which drops it because `IMMEndpoint::GetDataFlow` can never return `eAll`.
-  - Members `eRender`/`eCapture`/`eAll` renamed to `Render`/`Capture`/`All`; the
-    `EDataFlow_enum_count` sentinel was dropped.
+  The changes are summarised in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 namespace AudioDeviceLib.CoreAudioApi;

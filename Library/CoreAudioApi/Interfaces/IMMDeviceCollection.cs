@@ -1,4 +1,4 @@
-/*
+﻿/*
   LICENSE
   -------
   Copyright (C) 2007-2010 Ray Molenkamp
@@ -28,10 +28,8 @@
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi.Interfaces` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax).
+  The changes are summarised in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 using System.Runtime.InteropServices;
@@ -46,5 +44,5 @@ internal interface IMMDeviceCollection
     int GetCount(out uint pcDevices);
 
     [PreserveSig]
-    int Item(uint nDevice, out IMMDevice Device);
+    int Item(uint nDevice, [MarshalAs(UnmanagedType.Interface)] out IMMDevice Device);
 }

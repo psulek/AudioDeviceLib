@@ -1,7 +1,7 @@
 <component name="ProjectRunConfigurationManager">
   <configuration default="false" name="Library.Test cmd" type="DotNetProject" factoryName=".NET Project">
     <option name="EXE_PATH" value="$PROJECT_DIR$/Library.Test/bin/Debug/net8.0-windows/AudioDeviceLib.Test.exe" />
-    <option name="PROGRAM_PARAMETERS" value="volume --name Earphone --set 30" />
+    <option name="PROGRAM_PARAMETERS" value="volume --name Blaster --set 80" />
     <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/Library.Test/bin/Debug/net8.0-windows" />
     <option name="PASS_PARENT_ENVS" value="1" />
     <option name="ENV_FILE_PATHS" value="" />

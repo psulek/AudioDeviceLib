@@ -28,10 +28,8 @@
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi.Interfaces` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax).
+  The changes are summarised in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 using System;
@@ -41,17 +39,22 @@ namespace AudioDeviceLib.CoreAudioApi.Interfaces;
 
 [Guid("87CE5498-68D6-44E5-9215-6DA47EF883D8"),
  InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-internal interface ISimpleAudioVolume
+internal unsafe interface ISimpleAudioVolume
 {
+    // `EventContext` stays a raw pointer because NULL is meaningful on this interface: "If the
+    // caller supplies a NULL pointer for this parameter, the client's notification method receives
+    // a NULL context pointer" (ISimpleAudioVolume::SetMasterVolume). Contrast IAudioEndpointVolume,
+    // where a NULL context is documented to reach subscribers as GUID_NULL and `ref Guid` is
+    // therefore lossless. Callers go through SimpleAudioVolumeExtensions, which takes a `Guid?`.
     [PreserveSig]
-    int SetMasterVolume(float fLevel, ref Guid EventContext);
+    int SetMasterVolume(float fLevel, Guid* EventContext);
 
     [PreserveSig]
     int GetMasterVolume(out float pfLevel);
 
     [PreserveSig]
-    int SetMute(bool bMute, ref Guid EventContext);
+    int SetMute(int bMute, Guid* EventContext);
 
     [PreserveSig]
-    int GetMute(out bool bMute);
+    int GetMute(out int pbMute);
 }

@@ -1,4 +1,4 @@
-/*
+﻿/*
   LICENSE
   -------
   Copyright (C) 2007-2010 Ray Molenkamp
@@ -28,54 +28,63 @@
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi.Interfaces` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax).
-  - The `RegisterAudioSessionNotification` / `UnregisterAudioSessionNotification` parameter type
-    was renamed from `IAudioSessionEvents` to `IAudioSessionEventsCOM`; the
-    `IAudioSessionEvents` name now belongs to the library's own pure-C# event interface.
+  The changes are summarised in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 using System;
 using System.Runtime.InteropServices;
+using JetBrains.Annotations;
 
 namespace AudioDeviceLib.CoreAudioApi.Interfaces;
 
 [Guid("bfb7ff88-7239-4fc9-8fa2-07c950be9c6d"),
  InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-internal unsafe interface IAudioSessionControl2
+[PublicAPI]
+internal interface IAudioSessionControl2
 {
-    //IAudioSession functions
     [PreserveSig]
     int GetState(out AudioSessionState state);
 
     [PreserveSig]
     int GetDisplayName(out IntPtr name);
+    
+    [PreserveSig]
+    int GetIconPath(out IntPtr path);
+    
+    // `value` is a native LPCWSTR the callee only reads, so an explicitly marshalled string is
+    // both correct and simpler than pinning a char* at every call site. The attribute is not
+    // optional: an un-attributed `string` in COM interop marshals as BSTR.
+    //
+    // `pguidEventContext` is an LPCGUID the docs describe as nullable, but nothing here needs to
+    // send a null: SessionEventContextTests observed a null context arriving at subscribers as
+    // GUID_NULL, indistinguishable from an explicitly supplied Guid.Empty. Sending GUID_NULL
+    // instead costs nothing observable and keeps this interface free of pointers.
+    //
+    // The receiving side is NOT symmetric. IAudioSessionEventsCOM keeps `Guid*` because the value
+    // arriving there comes from whichever process made the change, and the docs say it may be
+    // null - see the comment on that interface.
+    [PreserveSig]
+    int SetDisplayName([MarshalAs(UnmanagedType.LPWStr)] string value, ref Guid pguidEventContext);
 
     [PreserveSig]
-    int SetDisplayName([MarshalAs(UnmanagedType.LPWStr)]string value, Guid* EventContext);
-    // int SetDisplayName(string value, ref Guid EventContext);
+    int SetIconPath([MarshalAs(UnmanagedType.LPWStr)] string value, ref Guid pguidEventContext);
+    
+    [PreserveSig]
+    int GetGroupingParam(out Guid groupingParam);
+
+    // `@override` is `ref Guid` on documented grounds - the native contract says it "must be a
+    // valid, non-NULL pointer to a grouping-parameter GUID". `pguidEventContext` is `ref Guid` for
+    // the reason given above.
+    [PreserveSig]
+    int SetGroupingParam(ref Guid @override, ref Guid pguidEventContext);
 
     [PreserveSig]
-    int GetIconPath(out IntPtr Path);
+    int RegisterAudioSessionNotification([MarshalAs(UnmanagedType.Interface)] IAudioSessionEventsCOM newNotifications);
 
     [PreserveSig]
-    int SetIconPath(string Value, ref Guid EventContext);
+    int UnregisterAudioSessionNotification([MarshalAs(UnmanagedType.Interface)] IAudioSessionEventsCOM newNotifications);
 
-    [PreserveSig]
-    int GetGroupingParam(out Guid GroupingParam);
-
-    [PreserveSig]
-    int SetGroupingParam(ref Guid Override, ref Guid Eventcontext);
-
-    [PreserveSig]
-    int RegisterAudioSessionNotification(IAudioSessionEventsCOM NewNotifications);
-
-    [PreserveSig]
-    int UnregisterAudioSessionNotification(IAudioSessionEventsCOM NewNotifications);
-
-    //IAudioSession2 functions
     [PreserveSig]
     int GetSessionIdentifier(out IntPtr retVal);
 
@@ -89,5 +98,5 @@ internal unsafe interface IAudioSessionControl2
     int IsSystemSoundsSession();
 
     [PreserveSig]
-    int SetDuckingPreference(bool optOut);
+    int SetDuckingPreference(int optOut);
 }

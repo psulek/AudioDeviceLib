@@ -1,4 +1,4 @@
-/*
+﻿/*
   LICENSE
   -------
   Copyright (C) 2007-2010 Ray Molenkamp
@@ -28,30 +28,27 @@
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi.Interfaces` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax).
+  The changes are summarised in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
-using System;
 using System.Runtime.InteropServices;
 
 namespace AudioDeviceLib.CoreAudioApi.Interfaces;
 
 [Guid("C02216F6-8C67-4B5B-9D00-D008E73E0064"),
  InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-internal interface IAudioMeterInformation
+internal unsafe interface IAudioMeterInformation
 {
     [PreserveSig]
     int GetPeakValue(out float pfPeak);
 
     [PreserveSig]
-    int GetMeteringChannelCount(out int pnChannelCount);
+    int GetMeteringChannelCount(out uint pnChannelCount);
 
     [PreserveSig]
-    int GetChannelsPeakValues(int u32ChannelCount, [Out, MarshalAs(UnmanagedType.LPArray, SizeParamIndex = 0)] float[] afPeakValues);
+    int GetChannelsPeakValues(uint u32ChannelCount, float* afPeakValues);
 
     [PreserveSig]
-    int QueryHardwareSupport(out int pdwHardwareSupportMask);
+    int QueryHardwareSupport(out uint pdwHardwareSupportMask);
 };

@@ -26,9 +26,14 @@ namespace AudioDeviceLib.CoreAudioApi;
 /// THREADING: the wrapped callbacks are raised by Windows Core Audio on arbitrary, non-UI
 /// threads and may arrive concurrently. The forwarded consumer must be quick and thread-safe.
 /// </remarks>
-internal sealed class AudioSessionEventsComAdapter : IAudioSessionEventsCOM
+internal sealed unsafe class AudioSessionEventsComAdapter : IAudioSessionEventsCOM
 {
     private const int S_OK = 0;
+
+    // Core Audio passes a null LPCGUID whenever the caller that made the change supplied no event
+    // context, so every context pointer is copied out on entry and never allowed to escape: the
+    // pointer is caller-owned and valid only for the duration of the callback.
+    private static Guid? ToEventContext(Guid* eventContext) => eventContext != null ? *eventContext : null;
 
     /// <summary>The session these notifications originate from; the source for each snapshot.</summary>
     private readonly AudioSessionControl _session;
@@ -42,11 +47,13 @@ internal sealed class AudioSessionEventsComAdapter : IAudioSessionEventsCOM
         Target = target ?? throw new ArgumentNullException(nameof(target));
     }
 
-    public int OnDisplayNameChanged(string NewDisplayName, ref Guid EventContext)
+    public int OnDisplayNameChanged(string NewDisplayName, Guid* EventContext)
     {
         try
         {
-            Target.OnDisplayNameChanged(_session.ToSessionInfo(), NewDisplayName, EventContext);
+            Guid? eventContext = ToEventContext(EventContext);
+
+            Target.OnDisplayNameChanged(_session.ToSessionInfo(), NewDisplayName, eventContext);
             return S_OK;
         }
         catch (Exception ex)
@@ -55,11 +62,13 @@ internal sealed class AudioSessionEventsComAdapter : IAudioSessionEventsCOM
         }
     }
 
-    public int OnIconPathChanged(string NewIconPath, ref Guid EventContext)
+    public int OnIconPathChanged(string NewIconPath, Guid* EventContext)
     {
         try
         {
-            Target.OnIconPathChanged(_session.ToSessionInfo(), NewIconPath, EventContext);
+            Guid? eventContext = ToEventContext(EventContext);
+
+            Target.OnIconPathChanged(_session.ToSessionInfo(), NewIconPath, eventContext);
             return S_OK;
         }
         catch (Exception ex)
@@ -68,11 +77,13 @@ internal sealed class AudioSessionEventsComAdapter : IAudioSessionEventsCOM
         }
     }
 
-    public int OnSimpleVolumeChanged(float NewVolume, bool newMute, ref Guid EventContext)
+    public int OnSimpleVolumeChanged(float NewVolume, int newMute, Guid* EventContext)
     {
         try
         {
-            Target.OnSimpleVolumeChanged(_session.ToSessionInfo(), NewVolume, newMute, EventContext);
+            Guid? eventContext = ToEventContext(EventContext);
+
+            Target.OnSimpleVolumeChanged(_session.ToSessionInfo(), NewVolume, newMute != 0, eventContext);
             return S_OK;
         }
         catch (Exception ex)
@@ -82,10 +93,12 @@ internal sealed class AudioSessionEventsComAdapter : IAudioSessionEventsCOM
     }
 
     public int OnChannelVolumeChanged(uint ChannelCount, IntPtr NewChannelVolumeArray, uint ChangedChannel,
-        ref Guid EventContext)
+        Guid* EventContext)
     {
         try
         {
+            Guid? eventContext = ToEventContext(EventContext);
+
             float[] volumes;
             if (NewChannelVolumeArray != IntPtr.Zero && ChannelCount > 0)
             {
@@ -97,7 +110,7 @@ internal sealed class AudioSessionEventsComAdapter : IAudioSessionEventsCOM
                 volumes = new float[0];
             }
 
-            Target.OnChannelVolumeChanged(_session.ToSessionInfo(), volumes, ChangedChannel, EventContext);
+            Target.OnChannelVolumeChanged(_session.ToSessionInfo(), volumes, ChangedChannel, eventContext);
             return S_OK;
         }
         catch (Exception ex)
@@ -106,11 +119,17 @@ internal sealed class AudioSessionEventsComAdapter : IAudioSessionEventsCOM
         }
     }
 
-    public int OnGroupingParamChanged(ref Guid NewGroupingParam, ref Guid EventContext)
+    public int OnGroupingParamChanged(Guid* NewGroupingParam, Guid* EventContext)
     {
         try
         {
-            Target.OnGroupingParamChanged(_session.ToSessionInfo(), NewGroupingParam, EventContext);
+            // Unlike the event context, a null grouping parameter is a protocol violation rather
+            // than a documented state, so it collapses to GUID_NULL - already the "ungrouped"
+            // value - instead of being surfaced. The public contract stays non-nullable.
+            Guid newGroupingParam = NewGroupingParam != null ? *NewGroupingParam : Guid.Empty;
+            Guid? eventContext = ToEventContext(EventContext);
+
+            Target.OnGroupingParamChanged(_session.ToSessionInfo(), newGroupingParam, eventContext);
             return S_OK;
         }
         catch (Exception ex)

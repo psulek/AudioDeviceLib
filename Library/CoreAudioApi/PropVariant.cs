@@ -1,4 +1,4 @@
-/*
+﻿/*
   LICENSE
   -------
   Copyright (C) 2007-2010 Ray Molenkamp
@@ -28,29 +28,8 @@
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
-    documentation comments.
-  - Added the `VarType` and `IsEmpty` accessors, exposing the previously private `vt` tag.
-  - `Value` now returns `null` for `VT_EMPTY`/`VT_NULL` instead of falling through to the
-    "FIXME Type = ..." diagnostic string.
-  - `boolVal` and `date` retyped from `bool`/`DateTime` to `short`/`double`, the real widths of
-    `VARIANT_BOOL` and `DATE`. That also makes every field blittable, which is what lets the struct
-    reach `PropVariantClear` without the marshaller reinterpreting the union.
-  - Added `Clear()`. The original never released the memory a returned PROPVARIANT owns, so every
-    `VT_LPWSTR` or `VT_BLOB` read leaked its payload.
-  - `Value` now handles `VT_BOOL` and `VT_DATE`, which previously fell through to the
-    "FIXME Type = ..." diagnostic string despite the union carrying both.
-  - `VT_I1` read the unsigned `bVal` instead of the signed `cVal`, and `VT_INT` read the 2-byte
-    `iVal` instead of the 4-byte `lVal`, truncating every value above 16 bits. Both corrected.
-  - An unconverted variant type now yields `null` rather than the "FIXME Type = ..." string, which
-    a caller could not distinguish from a real string value.
-  - `Value` now reads every member of the union that carries a value: `VT_UI1`, `VT_UI2`, `VT_UI8`,
-    `VT_UINT`, `VT_R4`, `VT_R8`, `VT_ERROR` and `VT_FILETIME` were declared but never reachable.
-    The three `wReserved` fields remain unread: they are PROPVARIANT padding, not values.
-  - Cases reordered by width and kind so a missing one is visible at a glance.
+  The changes are summarised in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 using System;

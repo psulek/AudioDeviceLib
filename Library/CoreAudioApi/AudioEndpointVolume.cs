@@ -1,4 +1,4 @@
-/*
+﻿/*
   LICENSE
   -------
   Copyright (C) 2007-2010 Ray Molenkamp
@@ -28,16 +28,8 @@
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
-    documentation comments.
-  - Added a `_disposed` flag and a `ThrowIfDisposed()` guard on the members that call into COM.
-  - Disposal reworked: added a `Dispose(bool)` pattern with `GC.SuppressFinalize`, routed the
-    finalizer through it, and made `UnregisterControlChangeNotify` best-effort so no exception
-    can escape `Dispose` (throwing from the finalizer thread would crash the process).
-  - `EEndpointHardwareSupport` renamed to `EndpointHardwareSupport`.
+  The changes are summarised in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 using System;
@@ -53,16 +45,28 @@ namespace AudioDeviceLib.CoreAudioApi;
 /// </summary>
 public class AudioEndpointVolume : IDisposable
 {
-    private IAudioEndpointVolume _audioEndPointVolume;
-    private AudioEndpointVolumeChannels _channels;
-    private AudioEndpointVolumeStepInformation _stepInformation;
-    private AudioEndPointVolumeVolumeRange _volumeRange;
-    private EndpointHardwareSupport _hardwareSupport;
+    private readonly IAudioEndpointVolume _audioEndPointVolume;
+    private readonly AudioEndpointVolumeChannels _channels;
+    private readonly AudioEndpointVolumeStepInformation _stepInformation;
+    private readonly AudioEndPointVolumeVolumeRange _volumeRange;
+    private readonly EndpointHardwareSupport _hardwareSupport;
     private AudioEndpointVolumeCallback _callBack;
     private bool _disposed;
 
     /// <summary>Raised when the endpoint volume or mute state changes.</summary>
     public event AudioEndpointVolumeNotificationDelegate OnVolumeNotification;
+
+    // The underlying COM interface. The wrapped members below cover the common cases; callers that
+    // need the raw entry points (the event-context overloads in AudioEndpointVolumeExtensions) go
+    // through here.
+    internal IAudioEndpointVolume Interface
+    {
+        get
+        {
+            ThrowIfDisposed();
+            return _audioEndPointVolume;
+        }
+    }
 
     /// <summary>Gets the supported volume range (minimum, maximum and step, in decibels) for the endpoint.</summary>
     public AudioEndPointVolumeVolumeRange VolumeRange => _volumeRange;
@@ -106,9 +110,6 @@ public class AudioEndpointVolume : IDisposable
         set
         {
             ThrowIfDisposed();
-            Guid? eventContext = value > 40 ? new Guid("19A4E577-AAAA-4CB8-96C7-4C2C4B46C90F") : (Guid?)null;
-            //Marshal.ThrowExceptionForHR(_AudioEndPointVolume.SetMasterVolumeLevelScalar(value, IntPtr.Zero));
-            //Marshal.ThrowExceptionForHR(_AudioEndPointVolume.SetMasterVolumeLevelScalar(value, ref eventContext));
             Marshal.ThrowExceptionForHR(_audioEndPointVolume.SetMasterVolumeLevelScalar(value));
         }
     }
@@ -120,7 +121,7 @@ public class AudioEndpointVolume : IDisposable
         get
         {
             ThrowIfDisposed();
-            Marshal.ThrowExceptionForHR(_audioEndPointVolume.GetMute(out var result));
+            Marshal.ThrowExceptionForHR(_audioEndPointVolume.GetMute(out bool result));
             return result;
         }
         set

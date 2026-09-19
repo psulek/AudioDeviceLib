@@ -1,4 +1,4 @@
-# AudioDeviceLib
+﻿# AudioDeviceLib
 
 A small, dependency-free **.NET** library for Windows that lists audio endpoints
 and sets the default playback/recording device, plus volume and mute control.
@@ -209,7 +209,7 @@ using AudioDeviceLib.CoreAudioApi;
 // the notification thread.
 sealed class SessionLogger : IAudioSessionEvents
 {
-    public void OnSimpleVolumeChanged(AudioSessionInfo session, float newVolume, bool newMute, Guid eventContext)
+    public void OnSimpleVolumeChanged(AudioSessionInfo session, float newVolume, bool newMute, Guid? eventContext)
     {
         Console.WriteLine($"pid={session.ProcessID} volume={newVolume:P0} muted={newMute}");
     }
@@ -220,10 +220,10 @@ sealed class SessionLogger : IAudioSessionEvents
     }
 
     // The remaining IAudioSessionEvents members can be left as no-ops.
-    public void OnDisplayNameChanged(AudioSessionInfo session, string newDisplayName, Guid eventContext) { }
-    public void OnIconPathChanged(AudioSessionInfo session, string newIconPath, Guid eventContext) { }
-    public void OnChannelVolumeChanged(AudioSessionInfo session, float[] newChannelVolumes, uint changedChannel, Guid eventContext) { }
-    public void OnGroupingParamChanged(AudioSessionInfo session, Guid newGroupingParam, Guid eventContext) { }
+    public void OnDisplayNameChanged(AudioSessionInfo session, string newDisplayName, Guid? eventContext) { }
+    public void OnIconPathChanged(AudioSessionInfo session, string newIconPath, Guid? eventContext) { }
+    public void OnChannelVolumeChanged(AudioSessionInfo session, float[] newChannelVolumes, uint changedChannel, Guid? eventContext) { }
+    public void OnGroupingParamChanged(AudioSessionInfo session, Guid newGroupingParam, Guid? eventContext) { }
     public void OnSessionDisconnected(AudioSessionInfo session, AudioSessionDisconnectReason disconnectReason) { }
 }
 ```

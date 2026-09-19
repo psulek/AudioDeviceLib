@@ -6,13 +6,8 @@
   the original source code. Altered by Peter Šulek for AudioDeviceLib
   (https://github.com/psulek/AudioDeviceLib).
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
-    documentation comments.
-  - The nested `_PolicyConfigClient` COM class was lifted to namespace scope.
-  - `ERole` renamed to `Role`.
+  The changes are summarised in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 using System.Runtime.InteropServices;

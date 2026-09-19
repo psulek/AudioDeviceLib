@@ -1,4 +1,4 @@
-/*
+﻿/*
   LICENSE
   -------
   Copyright (C) 2007-2010 Ray Molenkamp
@@ -29,12 +29,8 @@
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
   Derived from `SOURCE/eStgmAccess.cs` upstream.
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi.Interfaces` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax).
-  - Renamed from `eStgmAccess.cs` / `EStgmAccess` to `StgmAccess`; members `STGM_READ`/
-    `STGM_WRITE`/`STGM_READWRITE` renamed to `Read`/`Write`/`ReadWrite`.
+  The changes are summarised in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 namespace AudioDeviceLib.CoreAudioApi.Interfaces;

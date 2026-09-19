@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <!-- One leg per shipped library asset. netstandard2.0 cannot be targeted directly (it is a
@@ -6,6 +6,12 @@
          too new for a net7 consumer and net48 is incompatible, leaving netstandard2.0 as the only
          asset NuGet can pick. LoadedLibraryAssetTests asserts that at runtime. -->
     <TargetFrameworks>net48;net7.0-windows;net8.0-windows</TargetFrameworks>
+
+    <!-- RUN THE LEGS SERIALLY: `dotnet test -m:1`. Each target framework runs in its own
+         process, and the hardware tests drive the machine's real default endpoint - master and
+         per-channel volume, mute. [NonParallelizable] only orders fixtures within one assembly,
+         so without -m:1 the legs fight over the same endpoint and the volume-notification tests
+         fail intermittently. -->
 
     <!-- `Major`, not `LatestMajor`: LatestMajor jumps to the newest installed runtime even when an
          exact match exists, which would run every leg on the same runtime and defeat the split.
@@ -20,18 +26,22 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Microsoft.NET.Test.Sdk is pinned to 17.x deliberately: 18.x ships build assets for net462
-         and net8.0 only, which a net7.0-windows consumer matches neither of, so the netstandard2.0
-         leg would fail to restore. 17.9.0 ships net462 + netcoreapp3.1 and covers all three. -->
-    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.9.0" />
-    <PackageReference Include="NUnit" Version="4.4.0" />
-    <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NUnit" />
+    <PackageReference Include="NUnit3TestAdapter" />
+    <PackageReference Include="System.Text.Json" />
+  </ItemGroup>
+
+  <!-- Only the .NET Core legs need this: the .NET Framework leg uses a different NUnit engine
+       that does not load DependencyModel. See the note in Directory.Packages.props. -->
+  <ItemGroup Condition="'$(TargetFrameworkIdentifier)' != '.NETFramework'">
+    <PackageReference Include="Microsoft.Extensions.DependencyModel" />
   </ItemGroup>
 
   <!-- Build-time-only: lets the .NET SDK compile the net48 target without a machine-wide
        .NET Framework Developer Pack. No runtime dependency (PrivateAssets=all). -->
   <ItemGroup Condition="'$(TargetFrameworkIdentifier)' == '.NETFramework'">
-    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" PrivateAssets="all" />
   </ItemGroup>
 
   <ItemGroup>

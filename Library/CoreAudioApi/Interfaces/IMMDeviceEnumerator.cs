@@ -1,4 +1,4 @@
-/*
+﻿/*
   LICENSE
   -------
   Copyright (C) 2007-2010 Ray Molenkamp
@@ -28,17 +28,8 @@
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi.Interfaces` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax).
-  - `RegisterEndpointNotificationCallback` / `UnregisterEndpointNotificationCallback` now take a
-    typed `IMMNotificationClient` instead of `IntPtr`.
-  - `EDataFlow`/`EDeviceState`/`ERole` renamed to `DataFlow`/`DeviceState`/`Role`.
-  - `EnumAudioEndpoints` now takes the query-side `DataFlowFilter` / `DeviceStateFilter` rather than
-    the state-side `DataFlow` / `DeviceState`, so that `All` can only be passed where it is legal.
-    `GetDefaultAudioEndpoint` keeps the state-side `DataFlow`, which has no `All` member: the native
-    call requires a concrete direction, and this now fails to compile instead of at runtime.
+  The changes are summarised in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 using System;
@@ -51,17 +42,17 @@ namespace AudioDeviceLib.CoreAudioApi.Interfaces;
 internal interface IMMDeviceEnumerator
 {
     [PreserveSig]
-    int EnumAudioEndpoints(DataFlowFilter dataFlow, DeviceStateFilter StateMask, out IMMDeviceCollection device);
+    int EnumAudioEndpoints(DataFlowFilter dataFlow, DeviceStateFilter StateMask, [MarshalAs(UnmanagedType.Interface)] out IMMDeviceCollection device);
 
     [PreserveSig]
-    int GetDefaultAudioEndpoint(DataFlow dataFlow, Role role, out IMMDevice ppEndpoint);
+    int GetDefaultAudioEndpoint(DataFlow dataFlow, Role role, [MarshalAs(UnmanagedType.Interface)] out IMMDevice ppEndpoint);
 
     [PreserveSig]
-    int GetDevice(string pwstrId, out IMMDevice ppDevice);
+    int GetDevice(string pwstrId, [MarshalAs(UnmanagedType.Interface)] out IMMDevice ppDevice);
 
     [PreserveSig]
-    int RegisterEndpointNotificationCallback(IMMNotificationClient pClient);
+    int RegisterEndpointNotificationCallback([MarshalAs(UnmanagedType.Interface)] IMMNotificationClient pClient);
 
     [PreserveSig]
-    int UnregisterEndpointNotificationCallback(IMMNotificationClient pClient);
+    int UnregisterEndpointNotificationCallback([MarshalAs(UnmanagedType.Interface)] IMMNotificationClient pClient);
 }

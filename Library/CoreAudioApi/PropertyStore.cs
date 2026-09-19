@@ -1,4 +1,4 @@
-/*
+﻿/*
   LICENSE
   -------
   Copyright (C) 2007-2010 Ray Molenkamp
@@ -28,20 +28,15 @@
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
-    documentation comments.
-  - Added `TryGetValue`, a direct `IPropertyStore::GetValue` lookup that replaces the linear scans
-    for the common "fetch one known key" case.
-  - `Count` is no longer re-evaluated inside loop conditions; each scan reads it once.
+  The changes are summarised in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 using System;
 using System.Runtime.InteropServices;
 using AudioDeviceLib.CoreAudioApi.Interfaces;
 using JetBrains.Annotations;
+using static AudioDeviceLib.CoreAudioApi.InteropUtils;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
@@ -192,8 +187,12 @@ public class PropertyStore
         // IPropertyStore::GetValue takes the key directly, so this is one COM call where the
         // indexers walk the whole store. It also does NOT fail for a missing key: it returns S_OK
         // with a VT_EMPTY variant, which is why the emptiness check below is the real "found" test.
+        //
+        // The failure test must be HrFailed rather than a comparison against S_OK: the docs require
+        // callers to use SUCCEEDED here, because a value converted to a more canonical form comes
+        // back as INPLACE_S_TRUNCATED - a success code that still carries a usable variant.
         int hr = _store.GetValue(ref key, out var propValue);
-        if (hr != 0)
+        if (HrFailed(hr))
         {
             value = new PropertyValue(VarEnum.VT_EMPTY, null);
             return false;

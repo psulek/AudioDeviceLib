@@ -1,4 +1,4 @@
-/*
+﻿/*
   LICENSE
   -------
   Copyright (C) 2007-2010 Ray Molenkamp
@@ -28,36 +28,40 @@
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi.Interfaces` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax).
+  The changes are summarised in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 using System;
 using System.Runtime.InteropServices;
+using JetBrains.Annotations;
 
 namespace AudioDeviceLib.CoreAudioApi.Interfaces;
 
 [Guid("5CDF2C82-841E-4546-9722-0CF74078229A"),
  InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-internal unsafe interface IAudioEndpointVolume
+[PublicAPI]
+internal interface IAudioEndpointVolume
 {
     [PreserveSig]
-    int RegisterControlChangeNotify(IAudioEndpointVolumeCallback pNotify);
+    int RegisterControlChangeNotify([MarshalAs(UnmanagedType.Interface)] IAudioEndpointVolumeCallback pNotify);
 
     [PreserveSig]
-    int UnregisterControlChangeNotify(IAudioEndpointVolumeCallback pNotify);
+    int UnregisterControlChangeNotify([MarshalAs(UnmanagedType.Interface)] IAudioEndpointVolumeCallback pNotify);
 
     [PreserveSig]
-    int GetChannelCount(out int pnChannelCount);
+    int GetChannelCount(out uint pnChannelCount);
+
+    // The native `pguidEventContext` is an LPCGUID that accepts NULL, but a null pointer is not needed
+    // to express that here: Core Audio documents the substitution, "If pguidEventContext is NULL, the
+    // value of the guidEventContext member is set to GUID_NULL" (AUDIO_VOLUME_NOTIFICATION_DATA), so
+    // passing Guid.Empty is equivalent to passing NULL for every method below. `ref Guid` therefore
+    // loses nothing and matches how the rest of the interop layer declares an event context.
+    [PreserveSig]
+    int SetMasterVolumeLevel(float fLevelDB, ref Guid pguidEventContext);
 
     [PreserveSig]
-    int SetMasterVolumeLevel(float fLevelDB, Guid* pguidEventContext);
-    // int SetMasterVolumeLevel(float fLevelDB, IntPtr pguidEventContext);
-
-    [PreserveSig]
-    int SetMasterVolumeLevelScalar(float fLevel, Guid* pguidEventContext);
+    int SetMasterVolumeLevelScalar(float fLevel, ref Guid pguidEventContext);
 
     [PreserveSig]
     int GetMasterVolumeLevel(out float pfLevelDB);
@@ -66,12 +70,10 @@ internal unsafe interface IAudioEndpointVolume
     int GetMasterVolumeLevelScalar(out float pfLevel);
 
     [PreserveSig]
-    int SetChannelVolumeLevel(uint nChannel, float fLevelDB, Guid* pguidEventContext);
-    // int SetChannelVolumeLevel(uint nChannel, float fLevelDB, IntPtr pguidEventContext);
+    int SetChannelVolumeLevel(uint nChannel, float fLevelDB, ref Guid pguidEventContext);
 
     [PreserveSig]
-    int SetChannelVolumeLevelScalar(uint nChannel, float fLevel, Guid* pguidEventContext);
-    // int SetChannelVolumeLevelScalar(uint nChannel, float fLevel, IntPtr pguidEventContext);
+    int SetChannelVolumeLevelScalar(uint nChannel, float fLevel, ref Guid pguidEventContext);
 
     [PreserveSig]
     int GetChannelVolumeLevel(uint nChannel, out float pfLevelDB);
@@ -80,22 +82,19 @@ internal unsafe interface IAudioEndpointVolume
     int GetChannelVolumeLevelScalar(uint nChannel, out float pfLevel);
 
     [PreserveSig]
-    int SetMute([MarshalAs(UnmanagedType.Bool)] Boolean bMute, Guid* pguidEventContext);
-    // int SetMute([MarshalAs(UnmanagedType.Bool)] Boolean bMute, IntPtr pguidEventContext);
+    int SetMute(int bMute, ref Guid pguidEventContext);
 
     [PreserveSig]
-    int GetMute(out bool pbMute);
+    int GetMute(out int pbMute);
 
     [PreserveSig]
     int GetVolumeStepInfo(out uint pnStep, out uint pnStepCount);
 
     [PreserveSig]
-    int VolumeStepUp(Guid* pguidEventContext);
-    // int VolumeStepUp(IntPtr pguidEventContext);
+    int VolumeStepUp(ref Guid pguidEventContext);
 
     [PreserveSig]
-    int VolumeStepDown(Guid* pguidEventContext);
-    // int VolumeStepDown(IntPtr pguidEventContext);
+    int VolumeStepDown(ref Guid pguidEventContext);
 
     [PreserveSig]
     int QueryHardwareSupport(out uint pdwHardwareSupportMask);

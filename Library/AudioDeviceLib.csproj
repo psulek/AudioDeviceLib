@@ -4,7 +4,7 @@
     <TargetFrameworks>net48;netstandard2.0;net8.0-windows</TargetFrameworks>
 
     <ImplicitUsings>disable</ImplicitUsings>
-    <Nullable>disable</Nullable>
+    <Nullable>annotations</Nullable>
 
     <EnableComHosting>false</EnableComHosting>
 
@@ -38,15 +38,20 @@
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\" />
     <None Include="..\THIRD-PARTY-NOTICES.md" Pack="true" PackagePath="\" />
+    <None Include="..\MODIFICATIONS.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
   <!-- Build-time-only: lets the .NET SDK compile the net48 target without a machine-wide
        .NET Framework Developer Pack. No runtime dependency (PrivateAssets=all). -->
   <ItemGroup Condition="'$(TargetFrameworkIdentifier)' == '.NETFramework'">
-    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" PrivateAssets="all" />
   </ItemGroup>
   <ItemGroup>
-    <PackageReference Include="JetBrains.Annotations" Version="2026.2.0" PrivateAssets="all" />
+    <PackageReference Include="JetBrains.Annotations" PrivateAssets="all" />
+    <PackageReference Include="PolySharp">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
   <ItemGroup>

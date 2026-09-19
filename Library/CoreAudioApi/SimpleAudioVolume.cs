@@ -28,15 +28,13 @@
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
-    documentation comments.
+  The changes are summarised in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 using System;
 using System.Runtime.InteropServices;
+using AudioDeviceLib.CoreAudioApi.Extensions;
 using AudioDeviceLib.CoreAudioApi.Interfaces;
 
 namespace AudioDeviceLib.CoreAudioApi;
@@ -63,11 +61,7 @@ public class SimpleAudioVolume
             Marshal.ThrowExceptionForHR(_SimpleAudioVolume.GetMasterVolume(out var ret));
             return ret;
         }
-        set
-        {
-            Guid Empty = Guid.Empty;
-            Marshal.ThrowExceptionForHR(_SimpleAudioVolume.SetMasterVolume(value, ref Empty));
-        }
+        set => Marshal.ThrowExceptionForHR(_SimpleAudioVolume.SetMasterVolume(value));
     }
 
     /// <summary>Gets or sets the mute state of the session.</summary>
@@ -76,13 +70,9 @@ public class SimpleAudioVolume
     {
         get
         {
-            Marshal.ThrowExceptionForHR(_SimpleAudioVolume.GetMute(out var ret));
+            Marshal.ThrowExceptionForHR(_SimpleAudioVolume.GetMute(out bool ret));
             return ret;
         }
-        set
-        {
-            Guid Empty = Guid.Empty;
-            Marshal.ThrowExceptionForHR(_SimpleAudioVolume.SetMute(value, ref Empty));
-        }
+        set => Marshal.ThrowExceptionForHR(_SimpleAudioVolume.SetMute(value));
     }
 }

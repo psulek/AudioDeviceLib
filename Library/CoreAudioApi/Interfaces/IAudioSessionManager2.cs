@@ -28,10 +28,8 @@
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi.Interfaces` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax).
+  The changes are summarised in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 using System;
@@ -41,7 +39,7 @@ namespace AudioDeviceLib.CoreAudioApi.Interfaces;
 
 [Guid("77AA99A0-1BD6-484F-8BC7-2C654C9A9B6F"),
  InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
-interface IAudioSessionManager2
+internal interface IAudioSessionManager2
 {
     [PreserveSig]
     int GetAudioSessionControl(ref Guid AudioSessionGuid, UInt32 StreamFlags, IntPtr ISessionControl);
@@ -51,7 +49,7 @@ interface IAudioSessionManager2
         IntPtr /*ISimpleAudioVolume*/ SimpleAudioVolume);
 
     [PreserveSig]
-    int GetSessionEnumerator(out IAudioSessionEnumerator SessionEnum);
+    int GetSessionEnumerator([MarshalAs(UnmanagedType.Interface)] out IAudioSessionEnumerator SessionEnum);
 
     [PreserveSig]
     int RegisterSessionNotification(IntPtr IAudioSessionNotification);

@@ -28,26 +28,16 @@
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
-    documentation comments.
-  - `RegisterAudioSessionNotification` now accepts the library's pure-C# `IAudioSessionEvents`,
-    wraps it in an `AudioSessionEventsComAdapter` and returns an `IDisposable` registration
-    token. Registrations are tracked per consumer (by reference identity), so the same consumer
-    yields the same token and the identical sink object is handed back to COM on unregister.
-  - The class now implements `IDisposable` and unregisters every outstanding sink on disposal.
-  - Added the internal `ToSessionInfo()`, which builds an immutable `AudioSessionInfo` snapshot
-    tolerant of failing HRESULTs, so callbacks never receive the live COM object.
-  - The COM string getters were funnelled through a shared `TryGetString` helper that frees the
-    native buffer and can return `null` instead of throwing.
+  The changes are summarised in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using AudioDeviceLib.CoreAudioApi.Extensions;
 using AudioDeviceLib.CoreAudioApi.Interfaces;
+using static AudioDeviceLib.CoreAudioApi.InteropUtils;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
@@ -109,58 +99,51 @@ public class AudioSessionControl : IDisposable
         _AudioSessionControl = realAudioSessionControl;
     }
     
-    // Signature shared by the IAudioSessionControl2 getters that return a COM string pointer.
-    private delegate int GetStringPtr(out IntPtr ptr);
-
-    // Invokes one of the raw [PreserveSig] string getters and marshals its result: returns the
-    // string on S_OK (freeing the native buffer), or null when the call fails. Used for the
-    // display name, icon path and the two session identifiers, which all share this pattern.
-    private static string TryGetString(GetStringPtr getter, bool throwOnError = false)
+    // Reads one of the [PreserveSig] string getters and throws on failure. The snapshot path below
+    // deliberately does the opposite - see ToSessionInfo.
+    private static string RequireString(int hr, string value)
     {
-        var errorCode = getter(out var ptr);
-        if (errorCode == S_OK)
-        {
-            string value = Marshal.PtrToStringAuto(ptr);
-            Marshal.FreeCoTaskMem(ptr);
-            return value;
-        } 
-        
-        if (throwOnError)
-        {
-            Marshal.ThrowExceptionForHR(errorCode);
-        }
-
-        return null;
+        Marshal.ThrowExceptionForHR(hr);
+        return value;
     }
 
     // Builds an immutable snapshot of this session by reading the raw COM interface directly.
     // Each getter is [PreserveSig] returning an HRESULT, so instead of throwing we keep a value
-    // only when the call returns S_OK; anything that fails is left at its default. This makes the
+    // only when the call succeeds; anything that fails is left at its default. This makes the
     // snapshot safe to build even while the session is tearing down (e.g. on disconnect).
     internal AudioSessionInfo ToSessionInfo()
     {
-        string displayName = TryGetString(_AudioSessionControl.GetDisplayName);
-        string iconPath = TryGetString(_AudioSessionControl.GetIconPath);
-        string sessionIdentifier = TryGetString(_AudioSessionControl.GetSessionIdentifier);
-        string sessionInstanceIdentifier = TryGetString(_AudioSessionControl.GetSessionInstanceIdentifier);
+        _AudioSessionControl.GetDisplayName(out string displayName);
+        _AudioSessionControl.GetIconPath(out string iconPath);
+        _AudioSessionControl.GetSessionIdentifier(out string sessionIdentifier);
+        _AudioSessionControl.GetSessionInstanceIdentifier(out string sessionInstanceIdentifier);
 
         AudioSessionState state = default;
-        if (_AudioSessionControl.GetState(out var stateValue) == S_OK)
+        if (HrSuccess(_AudioSessionControl.GetState(out var stateValue)))
         {
             state = stateValue;
         }
 
+        // Not an S_OK comparison: a session spanning several processes returns
+        // AUDCLNT_S_NO_SINGLE_PROCESS, which is a success code that still writes a usable PID.
         uint processId = 0;
-        if (_AudioSessionControl.GetProcessId(out var pid) == S_OK)
+        if (HrSuccess(_AudioSessionControl.GetProcessId(out var pid)))
         {
             processId = pid;
         }
 
-        bool isSystemSounds = _AudioSessionControl.IsSystemSoundsSession() == S_OK;
+        bool isSystemSounds = GetIsSystemSoundsSession();
 
         return new AudioSessionInfo(displayName, iconPath, state, processId, sessionIdentifier,
             sessionInstanceIdentifier, isSystemSounds);
     }
+
+    private bool GetIsSystemSoundsSession()
+    {
+        // only hr == S_OK is a positive match; hr == S_FALSE is a negative match; any other HRESULT is an error
+        return _AudioSessionControl.IsSystemSoundsSession() == 0;
+    }
+
 
     /// <summary>Registers a callback to receive session change notifications.</summary>
     /// <param name="eventConsumer">The consumer that will receive <see cref="IAudioSessionEvents"/> callbacks.</param>
@@ -300,19 +283,23 @@ public class AudioSessionControl : IDisposable
 
     /// <summary>Gets the display name reported by the session, if any.</summary>
     /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
-    public string DisplayName => TryGetString(_AudioSessionControl.GetDisplayName, true);
+    public string DisplayName =>
+        RequireString(_AudioSessionControl.GetDisplayName(out string value), value);
 
     /// <summary>Gets the path of the icon reported by the session, if any.</summary>
     /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
-    public string IconPath => TryGetString(_AudioSessionControl.GetIconPath, true);
+    public string IconPath =>
+        RequireString(_AudioSessionControl.GetIconPath(out string value), value);
 
     /// <summary>Gets the session identifier string, shared by all instances of the same session.</summary>
     /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
-    public string SessionIdentifier => TryGetString(_AudioSessionControl.GetSessionIdentifier, true);
+    public string SessionIdentifier =>
+        RequireString(_AudioSessionControl.GetSessionIdentifier(out string value), value);
 
     /// <summary>Gets the identifier that uniquely distinguishes this session instance.</summary>
     /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
-    public string SessionInstanceIdentifier => TryGetString(_AudioSessionControl.GetSessionInstanceIdentifier, true);
+    public string SessionInstanceIdentifier =>
+        RequireString(_AudioSessionControl.GetSessionInstanceIdentifier(out string value), value);
 
     /// <summary>Gets the process identifier (PID) that owns the session.</summary>
     /// <exception cref="System.Runtime.InteropServices.COMException">Thrown when the underlying Core Audio call fails.</exception>
@@ -326,7 +313,7 @@ public class AudioSessionControl : IDisposable
     }
 
     /// <summary>Gets a value indicating whether this session is the reserved system-sounds session.</summary>
-    public bool IsSystemIsSystemSoundsSession => (_AudioSessionControl.IsSystemSoundsSession() == 0); //S_OK
+    public bool IsSystemSoundsSession => GetIsSystemSoundsSession();
 
     // Callers hold _registrationsLock; the flag is only ever written under it.
     private void ThrowIfDisposed()
