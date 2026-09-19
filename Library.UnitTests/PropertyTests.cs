@@ -125,6 +125,60 @@ public class PropertyTests
         Assert.That(value.Value, Is.Null);
     }
 
+    // A property that is present but carries a variant type this library does not convert has a
+    // null Value for a reason other than emptiness. Reporting success there would hand the caller
+    // nothing while claiming the read worked.
+    [TestCase(VarEnum.VT_VECTOR | VarEnum.VT_LPWSTR)]
+    [TestCase(VarEnum.VT_ARRAY | VarEnum.VT_I4)]
+    [TestCase(VarEnum.VT_STREAM)]
+    [TestCase(VarEnum.VT_UNKNOWN)]
+    public void UnsupportedType_IsReportedAsUnsupported_NotAsEmpty(VarEnum type)
+    {
+        var native = new StubStore { Type = type };
+        var store = new PropertyStore(native);
+
+        Assert.That(store.TryGetValue(native.Key, out var value), Is.False,
+            "an unconvertible variant type must not be reported as a successful read");
+        Assert.That(value.IsSupported, Is.False);
+        Assert.That(value.IsEmpty, Is.False, "the property is present; it is the type that is unhandled");
+        Assert.That(value.VarType, Is.EqualTo(type), "the caller still needs to know what was found");
+        Assert.That(value.Value, Is.Null);
+    }
+
+    [TestCase(VarEnum.VT_LPWSTR)]
+    [TestCase(VarEnum.VT_CLSID)]
+    [TestCase(VarEnum.VT_I4)]
+    public void SupportedType_IsReportedAsSupported(VarEnum type)
+    {
+        var native = new StubStore { Type = type };
+        var store = new PropertyStore(native);
+
+        store.TryGetValue(native.Key, out var value);
+
+        Assert.That(value.IsSupported, Is.True);
+    }
+
+    // The payload is a pointer to the GUID, not the GUID itself, so this reads through it rather
+    // than off the variant's inline union.
+    [Test]
+    public void ClsidVariant_ReadsTheGuidBehindThePointer()
+    {
+        var expected = Guid.NewGuid();
+        IntPtr payload = Marshal.AllocCoTaskMem(16);
+        try
+        {
+            Marshal.Copy(expected.ToByteArray(), 0, payload, 16);
+            PropVariant variant = CreateVariant(VarEnum.VT_CLSID,
+                target => Marshal.WriteIntPtr(target, payload));
+
+            Assert.That(variant.Value, Is.EqualTo(expected));
+        }
+        finally
+        {
+            Marshal.FreeCoTaskMem(payload);
+        }
+    }
+
     private sealed class StubStore : IPropertyStore
     {
         internal readonly PropertyKey Key = new PropertyKey { fmtid = Guid.NewGuid(), pid = 1 };

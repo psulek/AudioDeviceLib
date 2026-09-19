@@ -48,10 +48,13 @@ internal interface IAudioSessionControl2
 
     [PreserveSig]
     int GetDisplayName(out IntPtr name);
-    
-    [PreserveSig]
-    int GetIconPath(out IntPtr path);
-    
+
+    // DECLARATION ORDER IS THE VTABLE ORDER. audiopolicy.h lays IAudioSessionControl out as
+    // GetState, GetDisplayName, SetDisplayName, GetIconPath, SetIconPath, GetGroupingParam,
+    // SetGroupingParam, Register..., Unregister..., and IAudioSessionControl2 appends its five.
+    // Grouping the getters together here would bind GetIconPath to SetDisplayName's slot and vice
+    // versa, so keep each getter/setter pair interleaved exactly as the header has them.
+    //
     // `value` is a native LPCWSTR the callee only reads, so an explicitly marshalled string is
     // both correct and simpler than pinning a char* at every call site. The attribute is not
     // optional: an un-attributed `string` in COM interop marshals as BSTR.
@@ -66,6 +69,9 @@ internal interface IAudioSessionControl2
     // null - see the comment on that interface.
     [PreserveSig]
     int SetDisplayName([MarshalAs(UnmanagedType.LPWStr)] string value, ref Guid pguidEventContext);
+
+    [PreserveSig]
+    int GetIconPath(out IntPtr path);
 
     [PreserveSig]
     int SetIconPath([MarshalAs(UnmanagedType.LPWStr)] string value, ref Guid pguidEventContext);

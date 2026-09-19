@@ -199,7 +199,11 @@ public class PropertyStore
         }
 
         value = propValue.ToPropertyValue();
-        return !value.IsEmpty;
+
+        // A variant type this library does not convert leaves Value null, so reporting success
+        // would hand the caller nothing while claiming the property was read. The snapshot is still
+        // returned: VarType identifies what was found for anyone who wants to handle it.
+        return !value.IsEmpty && value.IsSupported;
     }
     internal PropertyStore(IPropertyStore store)
     {

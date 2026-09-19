@@ -365,7 +365,7 @@ public sealed class AudioDevice : IDisposable
 
     private string ReadFriendlyName()
     {
-        bool found = PropertyStoreCore.TryGetValue(PKEY.PKEY_DeviceInterface_FriendlyName, out var value);
+        bool found = PropertyStoreCore.TryGetValue(PKEY.PKEY_Device_FriendlyName, out var value);
         return found ? (value.Value as string ?? "Unknown") : "Unknown";
     }
 

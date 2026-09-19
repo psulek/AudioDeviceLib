@@ -108,16 +108,57 @@ internal struct PropVariant
     public PropertyValue ToPropertyValue()
     {
         object val;
+        bool supported;
         var varType = VarType;
         try
         {
-            val = Value;
+            supported = TryGetValue(out val);
         }
         finally
         {
             Clear();
         }
-        return new PropertyValue(varType, val);
+
+        return new PropertyValue(varType, val, supported);
+    }
+
+    // Separates "converted to null" from "this class does not convert this variant type", which
+    // Value alone cannot express: both come back as a null object. A property that is present but
+    // carries an unconvertible type is not a value the caller can use, and saying so is the only
+    // way TryGetValue can avoid reporting success with nothing in hand.
+    internal bool TryGetValue(out object value)
+    {
+        switch (VarType)
+        {
+            case VarEnum.VT_EMPTY:
+            case VarEnum.VT_NULL:
+            case VarEnum.VT_I1:
+            case VarEnum.VT_I2:
+            case VarEnum.VT_I4:
+            case VarEnum.VT_INT:
+            case VarEnum.VT_I8:
+            case VarEnum.VT_UI1:
+            case VarEnum.VT_UI2:
+            case VarEnum.VT_UI4:
+            case VarEnum.VT_UINT:
+            case VarEnum.VT_UI8:
+            case VarEnum.VT_R4:
+            case VarEnum.VT_R8:
+            case VarEnum.VT_BOOL:
+            case VarEnum.VT_DATE:
+            case VarEnum.VT_FILETIME:
+            case VarEnum.VT_ERROR:
+            case VarEnum.VT_LPWSTR:
+            case VarEnum.VT_LPSTR:
+            case VarEnum.VT_BSTR:
+            case VarEnum.VT_CLSID:
+            case VarEnum.VT_BLOB:
+                value = Value;
+                return true;
+            default:
+                value = null;
+                return false;
+        }
     }
 
     /// <summary>Gets the variant value converted to a managed object based on its variant type.</summary>
@@ -180,6 +221,19 @@ internal struct PropVariant
                     return scode;
                 case VarEnum.VT_LPWSTR:
                     return Marshal.PtrToStringUni(everything_else);
+                case VarEnum.VT_LPSTR:
+                    return Marshal.PtrToStringAnsi(everything_else);
+                case VarEnum.VT_BSTR:
+                    return everything_else == IntPtr.Zero
+                        ? null
+                        : Marshal.PtrToStringBSTR(everything_else);
+                // The payload is a pointer to the GUID, not the GUID itself, so the copy has to be
+                // taken before Clear frees it. (Note that PKEY_AudioEndpoint_GUID is not one of
+                // these: Core Audio stores that one as a VT_LPWSTR in registry-string form.)
+                case VarEnum.VT_CLSID:
+                    return everything_else == IntPtr.Zero
+                        ? (object)null
+                        : Marshal.PtrToStructure<Guid>(everything_else);
                 case VarEnum.VT_BLOB:
                     return GetBlob();
             }
