@@ -1,4 +1,4 @@
-/*
+﻿/*
   LICENSE
   -------
   Copyright (C) 2007-2010 Ray Molenkamp
@@ -28,37 +28,27 @@
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
-    documentation comments.
-  - The constructor now reads the value out of the PROPVARIANT and releases it, instead of storing
-    the variant and leaving its native payload to leak.
+  The changes are summarized in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
+
+using JetBrains.Annotations;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
 /// <summary>A single key/value entry read from a Core Audio <see cref="PropertyStore"/>.</summary>
-public class PropertyStoreProperty
+[PublicAPI]
+public sealed record PropertyStoreProperty
 {
-    private PropertyKey _PropertyKey;
-    private object _Value;
-
-    internal PropertyStoreProperty(PropertyKey key, PropVariant value)
+    internal PropertyStoreProperty(PropertyKey key, PropertyValue value)
     {
-        _PropertyKey = key;
-
-        // Read the value out and release the variant here. PropVariant.Value copies strings and
-        // blobs into managed memory, so nothing is lost by clearing immediately - and without it
-        // every property read through a PropertyStore indexer leaks its payload.
-        _Value = value.Value;
-        value.Clear();
+        Key = key;
+        Value = value;
     }
 
     /// <summary>Gets the key that identifies this property.</summary>
-    public PropertyKey Key => _PropertyKey;
+    public PropertyKey Key { get; }
 
     /// <summary>Gets the property value, converted to a managed type where supported.</summary>
-    public object Value => _Value;
+    public PropertyValue Value { get; }
 }

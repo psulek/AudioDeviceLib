@@ -1,0 +1,10 @@
+- name: Getting started
+  href: getting-started.md
+- name: Working with devices
+  href: devices.md
+- name: Notifications
+  href: notifications.md
+- name: Lifetime and threading
+  href: lifetime.md
+- name: Contributing and documentation
+  href: contributing.md

@@ -28,17 +28,11 @@
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
-    documentation comments.
-  - `Dispose` is idempotent and `Sessions` is guarded by `ThrowIfDisposed()`.
-  - Now implements `IDisposable` and disposes its `SessionCollection`.
+  The changes are summarized in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 using System;
-using System.Runtime.InteropServices;
 using AudioDeviceLib.CoreAudioApi.Interfaces;
 
 namespace AudioDeviceLib.CoreAudioApi;
@@ -47,50 +41,74 @@ namespace AudioDeviceLib.CoreAudioApi;
 /// Managed wrapper over the Core Audio <c>IAudioSessionManager2</c> interface. Provides access to
 /// the collection of audio sessions on an endpoint.
 /// </summary>
-public class AudioSessionManager : IDisposable
+public sealed class AudioSessionManager : IDisposable
 {
-    private IAudioSessionManager2 _AudioSessionManager;
-    private SessionCollection _Sessions;
+    private readonly IAudioSessionManager2COM _audioSessionManager;
+    private readonly object _lock = new object();
+    private SessionCollection? _sessions;
+    // Deliberately not volatile: the write and every guard check happen under _lock, which already
+    // supplies the ordering. Contrast AudioSessionControl, whose guard runs outside its lock.
     private bool _disposed;
 
-    internal AudioSessionManager(IAudioSessionManager2 realAudioSessionManager)
+    internal AudioSessionManager(IAudioSessionManager2COM audioSessionManager)
     {
-        _AudioSessionManager = realAudioSessionManager;
-        Marshal.ThrowExceptionForHR(_AudioSessionManager.GetSessionEnumerator(out IAudioSessionEnumerator _SessionEnum));
-        _Sessions = new SessionCollection(_SessionEnum);
+        _audioSessionManager = audioSessionManager ?? throw new ArgumentNullException(nameof(audioSessionManager));
     }
 
-    /// <summary>Gets the collection of audio sessions currently associated with the endpoint.</summary>
-    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed.</exception>
+    /// <summary>Gets the session snapshot, created on first access.</summary>
+    /// <remarks>The snapshot stays fixed until Refresh is called. The manager owns it.</remarks>
     public SessionCollection Sessions
     {
         get
         {
-            ThrowIfDisposed();
-            return _Sessions;
+            lock (_lock)
+            {
+                ThrowIfDisposed();
+                return _sessions ??= CreateSnapshot();
+            }
         }
     }
 
-    /// <summary>Disposes the owned <see cref="SessionCollection"/> (and its cached sessions).</summary>
+    /// <summary>Replaces the snapshot with the endpoint's current sessions.</summary>
+    /// <remarks>Disposes the previous collection and its controls, including their notification tokens.</remarks>
+    public void Refresh()
+    {
+        SessionCollection? previous;
+        lock (_lock)
+        {
+            ThrowIfDisposed();
+            var replacement = CreateSnapshot();
+            previous = _sessions;
+            _sessions = replacement;
+        }
+        previous?.Dispose();
+    }
+
+    private SessionCollection CreateSnapshot()
+    {
+        InteropUtils.ThrowIfFailed(_audioSessionManager.GetSessionEnumerator(out var enumerator));
+        return new SessionCollection(enumerator);
+    }
+
+    /// <summary>Disposes the owned session collection and its controls.</summary>
     public void Dispose()
     {
-        if (_disposed)
+        SessionCollection? previous;
+        lock (_lock)
         {
-            return;
+            if (_disposed)
+            {
+                return;
+            }
+            _disposed = true;
+            previous = _sessions;
+            _sessions = null;
         }
-
-        _disposed = true;
-
-        _Sessions?.Dispose();
-        _Sessions = null;
-        _AudioSessionManager = null;
+        previous?.Dispose();
     }
 
     private void ThrowIfDisposed()
     {
-        if (_disposed)
-        {
-            throw new ObjectDisposedException(nameof(AudioSessionManager));
-        }
+        InteropUtils.RequireNotDisposed(_disposed, this);
     }
 }

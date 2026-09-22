@@ -1,0 +1,313 @@
+﻿namespace AudioDeviceLib
+{
+    public sealed class AudioController : System.IDisposable
+    {
+        public AudioController() { }
+        public void Dispose() { }
+        public AudioDeviceLib.AudioDevice? GetDefaultPlaybackDevice(bool communications = false) { }
+        public AudioDeviceLib.AudioDevice? GetDefaultRecordingDevice(bool communications = false) { }
+        public AudioDeviceLib.AudioDevice? GetDeviceById(string deviceId) { }
+        public AudioDeviceLib.AudioDeviceInfo? GetDeviceInfo(string deviceId) { }
+        public System.Collections.Generic.IReadOnlyList<AudioDeviceLib.AudioDevice> GetDevices(AudioDeviceLib.CoreAudioApi.DataFlowFilter flow = 2, AudioDeviceLib.CoreAudioApi.DeviceStateFilter state = 1) { }
+        public System.Collections.Generic.IReadOnlyList<AudioDeviceLib.AudioDevice> GetPlaybackDevices(AudioDeviceLib.CoreAudioApi.DeviceStateFilter state = 1) { }
+        public System.Collections.Generic.IReadOnlyList<AudioDeviceLib.AudioDevice> GetRecordingDevices(AudioDeviceLib.CoreAudioApi.DeviceStateFilter state = 1) { }
+        public System.IDisposable RegisterDeviceNotification(AudioDeviceLib.CoreAudioApi.IAudioDeviceEvents consumer) { }
+        public void SetDefaultDevice(AudioDeviceLib.AudioDevice device, AudioDeviceLib.DefaultRole roles = 6) { }
+        public static AudioDeviceLib.AudioDeviceInfo? GetDefaultPlayback(bool communications = false) { }
+        public static AudioDeviceLib.AudioDeviceInfo? GetDefaultRecording(bool communications = false) { }
+        public static float GetVolume() { }
+        public static float GetVolume(string deviceId) { }
+        public static bool IsMuted() { }
+        public static bool IsMuted(string deviceId) { }
+        public static System.Collections.Generic.IReadOnlyList<AudioDeviceLib.AudioDeviceInfo> ListDevices() { }
+        public static System.Collections.Generic.IReadOnlyList<AudioDeviceLib.AudioDeviceInfo> ListDevices(AudioDeviceLib.AudioDeviceKind kind) { }
+        public static void SetDefaultDevice(string deviceId, AudioDeviceLib.DefaultRole roles = 6) { }
+        public static AudioDeviceLib.AudioDeviceInfo? SetDefaultPlaybackByName(string name, AudioDeviceLib.DefaultRole roles = 6) { }
+        public static AudioDeviceLib.AudioDeviceInfo? SetDefaultRecordingByName(string name, AudioDeviceLib.DefaultRole roles = 6) { }
+        public static void SetMute(bool mute) { }
+        public static void SetMute(string deviceId, bool mute) { }
+        public static void SetVolume(float percent) { }
+        public static void SetVolume(string deviceId, float percent) { }
+        public static bool ToggleMute() { }
+        public static bool ToggleMute(string deviceId) { }
+    }
+    public sealed class AudioDevice : System.IDisposable, System.IEquatable<AudioDeviceLib.AudioDevice>
+    {
+        public string Id { get; }
+        public bool IsActive { get; }
+        public bool IsDefault { get; }
+        public bool IsDefaultCommunication { get; }
+        public bool IsMuted { get; set; }
+        public AudioDeviceLib.AudioDeviceKind Kind { get; }
+        public AudioDeviceLib.CoreAudioApi.AudioMeterInformation Meter { get; }
+        public string Name { get; }
+        public AudioDeviceLib.CoreAudioApi.PropertyStore Properties { get; }
+        public AudioDeviceLib.CoreAudioApi.AudioSessionManager SessionManager { get; }
+        public AudioDeviceLib.CoreAudioApi.DeviceState State { get; }
+        public AudioDeviceLib.CoreAudioApi.AudioEndpointVolume Volume { get; }
+        public void Dispose() { }
+        public bool Equals(AudioDeviceLib.AudioDevice? other) { }
+        public override bool Equals(object? obj) { }
+        public override int GetHashCode() { }
+        public float GetPeakValue() { }
+        public float GetVolumePercent() { }
+        public void Refresh() { }
+        public void SetVolumePercent(float percent) { }
+        public AudioDeviceLib.AudioDeviceInfo ToDeviceInfo() { }
+        public override string ToString() { }
+        public bool ToggleMute() { }
+        public static bool operator !=(AudioDeviceLib.AudioDevice? left, AudioDeviceLib.AudioDevice? right) { }
+        public static bool operator ==(AudioDeviceLib.AudioDevice? left, AudioDeviceLib.AudioDevice? right) { }
+    }
+    public sealed class AudioDeviceInfo : System.IEquatable<AudioDeviceLib.AudioDeviceInfo>
+    {
+        public string Id { get; }
+        public bool IsDefault { get; }
+        public bool IsDefaultCommunication { get; }
+        public AudioDeviceLib.AudioDeviceKind Kind { get; }
+        public string Name { get; }
+        public AudioDeviceLib.CoreAudioApi.DeviceState State { get; }
+        public bool Equals(AudioDeviceLib.AudioDeviceInfo? other) { }
+        public override int GetHashCode() { }
+        public override string ToString() { }
+    }
+    public enum AudioDeviceKind
+    {
+        Playback = 0,
+        Recording = 1,
+    }
+    [System.Flags]
+    public enum DefaultRole
+    {
+        Console = 1,
+        Multimedia = 2,
+        Communications = 4,
+        Default = 6,
+        All = 7,
+    }
+}
+namespace AudioDeviceLib.CoreAudioApi
+{
+    public readonly struct AudioEndPointVolumeVolumeRange : System.IEquatable<AudioDeviceLib.CoreAudioApi.AudioEndPointVolumeVolumeRange>
+    {
+        public float IncrementdB { get; }
+        public float MaxdB { get; }
+        public float MindB { get; }
+    }
+    public sealed class AudioEndpointVolume : System.IDisposable
+    {
+        public AudioDeviceLib.CoreAudioApi.AudioEndpointVolumeChannels Channels { get; }
+        public AudioDeviceLib.CoreAudioApi.EndpointHardwareSupport HardwareSupport { get; }
+        public float MasterVolumeLevel { get; set; }
+        public float MasterVolumeLevelScalar { get; set; }
+        public bool Mute { get; set; }
+        public AudioDeviceLib.CoreAudioApi.AudioEndpointVolumeStepInformation StepInformation { get; }
+        public AudioDeviceLib.CoreAudioApi.AudioEndPointVolumeVolumeRange VolumeRange { get; }
+        public void Dispose() { }
+        public System.IDisposable RegisterVolumeNotification(AudioDeviceLib.CoreAudioApi.IAudioEndpointVolumeEvents eventConsumer) { }
+        public void VolumeStepDown() { }
+        public void VolumeStepUp() { }
+    }
+    public sealed class AudioEndpointVolumeChannel : System.IDisposable
+    {
+        public float VolumeLevel { get; set; }
+        public float VolumeLevelScalar { get; set; }
+        public void Dispose() { }
+    }
+    public sealed class AudioEndpointVolumeChannels : System.Collections.Generic.IEnumerable<AudioDeviceLib.CoreAudioApi.AudioEndpointVolumeChannel>, System.Collections.Generic.IReadOnlyCollection<AudioDeviceLib.CoreAudioApi.AudioEndpointVolumeChannel>, System.Collections.Generic.IReadOnlyList<AudioDeviceLib.CoreAudioApi.AudioEndpointVolumeChannel>, System.Collections.IEnumerable
+    {
+        public int Count { get; }
+        public AudioDeviceLib.CoreAudioApi.AudioEndpointVolumeChannel this[int index] { get; }
+        public System.Collections.Generic.IEnumerator<AudioDeviceLib.CoreAudioApi.AudioEndpointVolumeChannel> GetEnumerator() { }
+    }
+    public sealed class AudioEndpointVolumeStepInformation : System.IDisposable
+    {
+        public uint Step { get; }
+        public uint StepCount { get; }
+        public void Dispose() { }
+    }
+    public sealed class AudioMeterInformation : System.IDisposable
+    {
+        public AudioDeviceLib.CoreAudioApi.EndpointHardwareSupport HardwareSupport { get; }
+        public float MasterPeakValue { get; }
+        public uint MeteringChannelCount { get; }
+        public void Dispose() { }
+        public float[] GetChannelsPeakValues() { }
+    }
+    public class AudioSessionBaseInfo : System.IEquatable<AudioDeviceLib.CoreAudioApi.AudioSessionBaseInfo>
+    {
+        public bool IsSystemSoundsSession { get; }
+        public uint ProcessId { get; }
+        public string SessionIdentifier { get; }
+        public string SessionInstanceIdentifier { get; }
+    }
+    public sealed class AudioSessionControl : System.IDisposable
+    {
+        public AudioDeviceLib.CoreAudioApi.AudioMeterInformation? AudioMeterInformation { get; }
+        public AudioDeviceLib.CoreAudioApi.SimpleAudioVolume? SimpleAudioVolume { get; }
+        public AudioDeviceLib.CoreAudioApi.AudioSessionState State { get; }
+        public void Dispose() { }
+        public System.IDisposable RegisterAudioSessionNotification(AudioDeviceLib.CoreAudioApi.IAudioSessionEvents eventConsumer) { }
+        public void UnregisterAudioSessionNotification(AudioDeviceLib.CoreAudioApi.IAudioSessionEvents eventConsumer) { }
+    }
+    public enum AudioSessionDisconnectReason
+    {
+        DeviceRemoval = 0,
+        ServerShutdown = 1,
+        FormatChanged = 2,
+        SessionLogoff = 3,
+        SessionDisconnected = 4,
+        ExclusiveModeOverride = 5,
+    }
+    public sealed class AudioSessionInfo : AudioDeviceLib.CoreAudioApi.AudioSessionBaseInfo, System.IEquatable<AudioDeviceLib.CoreAudioApi.AudioSessionInfo>
+    {
+        public string DisplayName { get; }
+        public string IconPath { get; }
+        public AudioDeviceLib.CoreAudioApi.AudioSessionState State { get; }
+    }
+    public sealed class AudioSessionManager : System.IDisposable
+    {
+        public AudioDeviceLib.CoreAudioApi.SessionCollection Sessions { get; }
+        public void Dispose() { }
+        public void Refresh() { }
+    }
+    public enum AudioSessionState
+    {
+        Inactive = 0,
+        Active = 1,
+        Expired = 2,
+    }
+    public sealed class AudioVolumeNotificationData : System.IEquatable<AudioDeviceLib.CoreAudioApi.AudioVolumeNotificationData>
+    {
+        public AudioVolumeNotificationData(System.Guid eventContext, bool muted, float masterVolume, float[] channelVolume) { }
+        public System.Collections.Generic.IReadOnlyList<float> ChannelVolume { get; }
+        public int Channels { get; }
+        public System.Guid EventContext { get; }
+        public float MasterVolume { get; }
+        public bool Muted { get; }
+    }
+    public enum DataFlow
+    {
+        Render = 0,
+        Capture = 1,
+    }
+    public enum DataFlowFilter
+    {
+        Render = 0,
+        Capture = 1,
+        All = 2,
+    }
+    public enum DeviceState : uint
+    {
+        Active = 1u,
+        Disabled = 2u,
+        NotPresent = 4u,
+        Unplugged = 8u,
+    }
+    [System.Flags]
+    public enum DeviceStateFilter : uint
+    {
+        Active = 1u,
+        Disabled = 2u,
+        NotPresent = 4u,
+        Unplugged = 8u,
+        All = 15u,
+    }
+    [System.Flags]
+    public enum EndpointHardwareSupport
+    {
+        Volume = 1,
+        Mute = 2,
+        Meter = 4,
+        All = 7,
+    }
+    public interface IAudioDeviceEvents
+    {
+        void OnDefaultDeviceChanged(AudioDeviceLib.CoreAudioApi.DataFlow flow, AudioDeviceLib.CoreAudioApi.Role role, string defaultDeviceId);
+        void OnDeviceAdded(string deviceId);
+        void OnDeviceRemoved(string deviceId);
+        void OnDeviceStateChanged(string deviceId, AudioDeviceLib.CoreAudioApi.DeviceState newState);
+        void OnPropertyValueChanged(string deviceId, AudioDeviceLib.CoreAudioApi.PropertyKey key);
+    }
+    public interface IAudioEndpointVolumeEvents
+    {
+        void OnVolumeNotification(AudioDeviceLib.CoreAudioApi.AudioVolumeNotificationData data);
+    }
+    public interface IAudioSessionEvents
+    {
+        void OnChannelVolumeChanged(AudioDeviceLib.CoreAudioApi.AudioSessionInfo session, float[] newChannelVolumes, uint changedChannel, System.Guid? eventContext);
+        void OnDisplayNameChanged(AudioDeviceLib.CoreAudioApi.AudioSessionInfo session, string newDisplayName, System.Guid? eventContext);
+        void OnGroupingParamChanged(AudioDeviceLib.CoreAudioApi.AudioSessionInfo session, System.Guid newGroupingParam, System.Guid? eventContext);
+        void OnIconPathChanged(AudioDeviceLib.CoreAudioApi.AudioSessionInfo session, string newIconPath, System.Guid? eventContext);
+        void OnSessionDisconnected(AudioDeviceLib.CoreAudioApi.AudioSessionBaseInfo session, AudioDeviceLib.CoreAudioApi.AudioSessionDisconnectReason disconnectReason);
+        void OnSimpleVolumeChanged(AudioDeviceLib.CoreAudioApi.AudioSessionInfo session, float newVolume, bool newMute, System.Guid? eventContext);
+        void OnStateChanged(AudioDeviceLib.CoreAudioApi.AudioSessionInfo session, AudioDeviceLib.CoreAudioApi.AudioSessionState newState);
+    }
+    public static class PKEY
+    {
+        public static AudioDeviceLib.CoreAudioApi.PropertyKey AudioEndpointAssociation { get; }
+        public static AudioDeviceLib.CoreAudioApi.PropertyKey AudioEndpointControlPanelPageProvider { get; }
+        public static AudioDeviceLib.CoreAudioApi.PropertyKey AudioEndpointDisableSysFx { get; }
+        public static AudioDeviceLib.CoreAudioApi.PropertyKey AudioEndpointFormFactor { get; }
+        public static AudioDeviceLib.CoreAudioApi.PropertyKey AudioEndpointFullRangeSpeakers { get; }
+        public static AudioDeviceLib.CoreAudioApi.PropertyKey AudioEndpointGuid { get; }
+        public static AudioDeviceLib.CoreAudioApi.PropertyKey AudioEndpointJackSubType { get; }
+        public static AudioDeviceLib.CoreAudioApi.PropertyKey AudioEndpointPhysicalSpeakers { get; }
+        public static AudioDeviceLib.CoreAudioApi.PropertyKey AudioEndpointSupportsEventDrivenMode { get; }
+        public static AudioDeviceLib.CoreAudioApi.PropertyKey AudioEngineDeviceFormat { get; }
+        public static AudioDeviceLib.CoreAudioApi.PropertyKey AudioEngineOemFormat { get; }
+        public static AudioDeviceLib.CoreAudioApi.PropertyKey DeviceDeviceDesc { get; }
+        public static AudioDeviceLib.CoreAudioApi.PropertyKey DeviceFriendlyName { get; }
+        public static AudioDeviceLib.CoreAudioApi.PropertyKey DeviceInterfaceFriendlyName { get; }
+    }
+    public readonly struct PropertyKey : System.IEquatable<AudioDeviceLib.CoreAudioApi.PropertyKey>
+    {
+        public System.Guid FormatId { get; init; }
+        public string Name { get; }
+        public int PropertyId { get; init; }
+    }
+    public sealed class PropertyStore : System.IDisposable
+    {
+        public int Count { get; }
+        public AudioDeviceLib.CoreAudioApi.PropertyStoreProperty this[int index] { get; }
+        public AudioDeviceLib.CoreAudioApi.PropertyStoreProperty? this[System.Guid formatId] { get; }
+        public AudioDeviceLib.CoreAudioApi.PropertyStoreProperty? this[AudioDeviceLib.CoreAudioApi.PropertyKey queryKey] { get; }
+        public bool Contains(AudioDeviceLib.CoreAudioApi.PropertyKey compareKey) { }
+        public bool Contains(System.Guid formatId) { }
+        public void Dispose() { }
+        public AudioDeviceLib.CoreAudioApi.PropertyKey Get(int index) { }
+        public AudioDeviceLib.CoreAudioApi.PropertyValue GetValue(int index) { }
+        public bool TryGetValue(AudioDeviceLib.CoreAudioApi.PropertyKey key, out AudioDeviceLib.CoreAudioApi.PropertyValue value) { }
+    }
+    public sealed class PropertyStoreProperty : System.IEquatable<AudioDeviceLib.CoreAudioApi.PropertyStoreProperty>
+    {
+        public AudioDeviceLib.CoreAudioApi.PropertyKey Key { get; }
+        public AudioDeviceLib.CoreAudioApi.PropertyValue Value { get; }
+    }
+    public sealed class PropertyValue : System.IEquatable<AudioDeviceLib.CoreAudioApi.PropertyValue>
+    {
+        public bool IsEmpty { get; }
+        public bool IsSupported { get; }
+        public object? Value { get; }
+        public System.Runtime.InteropServices.VarEnum VarType { get; }
+    }
+    public enum Role
+    {
+        Console = 0,
+        Multimedia = 1,
+        Communications = 2,
+    }
+    public sealed class SessionCollection : System.Collections.Generic.IEnumerable<AudioDeviceLib.CoreAudioApi.AudioSessionControl>, System.Collections.Generic.IReadOnlyCollection<AudioDeviceLib.CoreAudioApi.AudioSessionControl>, System.Collections.Generic.IReadOnlyList<AudioDeviceLib.CoreAudioApi.AudioSessionControl>, System.Collections.IEnumerable, System.IDisposable
+    {
+        public int Count { get; }
+        public AudioDeviceLib.CoreAudioApi.AudioSessionControl this[int index] { get; }
+        public void Dispose() { }
+        public System.Collections.Generic.IEnumerator<AudioDeviceLib.CoreAudioApi.AudioSessionControl> GetEnumerator() { }
+    }
+    public sealed class SimpleAudioVolume : System.IDisposable
+    {
+        public float MasterVolume { get; set; }
+        public bool Mute { get; set; }
+        public void Dispose() { }
+    }
+}

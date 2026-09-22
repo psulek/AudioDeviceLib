@@ -14,7 +14,7 @@ namespace AudioDeviceLib.CoreAudioApi;
 
 /// <summary>
 /// Receives change notifications for the set of audio endpoints. Implement this and register it with
-/// <see cref="AudioDeviceLib.Lib.AudioController.RegisterDeviceNotification"/>.
+/// <see cref="AudioDeviceLib.AudioController.RegisterDeviceNotification"/>.
 /// </summary>
 /// <remarks>
 /// THREADING: these callbacks are raised by Windows Core Audio on arbitrary, non-UI threads, and may
@@ -23,8 +23,8 @@ namespace AudioDeviceLib.CoreAudioApi;
 /// thrown from a callback are converted to an HRESULT and returned to the audio engine; prefer
 /// handling errors inside the callback.
 /// <para>
-/// Do NOT register/unregister notifications or dispose the <see cref="AudioDeviceLib.Lib.AudioController"/>
-/// from inside a callback — that reenters Core Audio while it is dispatching. The payload is plain
+/// Do NOT register/unregister notifications or dispose the <see cref="AudioDeviceLib.AudioController"/>
+/// from inside a callback - that reenters Core Audio while it is dispatching. The payload is plain
 /// data (endpoint ID strings and enums), so there is no live COM object to misuse.
 /// </para>
 /// </remarks>
@@ -49,7 +49,7 @@ public interface IAudioDeviceEvents
     /// <summary>Called when the default endpoint changes for a given data flow and role.</summary>
     /// <param name="flow">The data-flow direction whose default changed (<see cref="DataFlow.Render"/> or <see cref="DataFlow.Capture"/>).</param>
     /// <param name="role">
-    /// The role whose default changed — for example <see cref="Role.Communications"/> distinguishes a
+    /// The role whose default changed - for example <see cref="Role.Communications"/> distinguishes a
     /// change to the default communications device from the console/multimedia default.
     /// </param>
     /// <param name="defaultDeviceId">
@@ -65,7 +65,7 @@ public interface IAudioDeviceEvents
     /// The property that changed. Use <see cref="PropertyKey.Name"/> for a friendly name of the property.
     /// </param>
     /// <remarks>Called on an arbitrary, non-UI thread.</remarks>
-    // TODO: expose the new value too — read it from the device's property store (open the MMDevice for
+    // TODO: expose the new value too - read it from the device's property store (open the MMDevice for
     //       deviceId, then Properties[key]); deferred for now to avoid a COM read on the callback thread.
     void OnPropertyValueChanged(string deviceId, PropertyKey key);
 }

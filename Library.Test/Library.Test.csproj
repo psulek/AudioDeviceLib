@@ -4,7 +4,7 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0-windows</TargetFramework>
     <ImplicitUsings>disable</ImplicitUsings>
-    <Nullable>disable</Nullable>
+    <Nullable>enable</Nullable>
     <RootNamespace>AudioDeviceLib.Test</RootNamespace>
     <AssemblyName>AudioDeviceLib.Test</AssemblyName>
   </PropertyGroup>

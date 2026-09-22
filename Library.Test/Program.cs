@@ -12,7 +12,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using AudioDeviceLib.CoreAudioApi;
-using AudioDeviceLib.Lib;
 
 namespace AudioDeviceLib.Test;
 
@@ -35,7 +34,7 @@ internal static class Program
 
         try
         {
-            var audio = new AudioController();
+            using var audio = new AudioController();
             switch (command)
             {
                 case "list":    return CmdList(audio, opts);
@@ -80,17 +79,27 @@ internal static class Program
 
     private static void RenderDevices(IReadOnlyList<AudioDevice> devices)
     {
-        if (devices.Count == 0)
+        try
         {
-            Console.WriteLine("(no active devices)");
-            return;
-        }
+            if (devices.Count == 0)
+            {
+                Console.WriteLine("(no active devices)");
+                return;
+            }
 
-        Console.WriteLine("Kind       Def  Comm  Name, ID");
-        Console.WriteLine("---------  ---  ----  --------------------------------------");
-        foreach (var d in devices)
+            Console.WriteLine("Kind       Def  Comm  Name, ID");
+            Console.WriteLine("---------  ---  ----  --------------------------------------");
+            foreach (var d in devices)
+            {
+                Console.WriteLine($"{d.Kind,-9}  {(d.IsDefault ? "*" : ""),-3}  {(d.IsDefaultCommunication ? "*" : ""),-4}  {d.Name}, {d.Id}");
+            }
+        }
+        finally
         {
-            Console.WriteLine($"{d.Kind,-9}  {(d.IsDefault ? "*" : ""),-3}  {(d.IsDefaultCommunication ? "*" : ""),-4}  {d.Name}, {d.Id}");
+            foreach (var device in devices)
+            {
+                device.Dispose();
+            }
         }
     }
 
@@ -99,7 +108,7 @@ internal static class Program
         bool comm = o.Has("comm");
         bool recording = o.Has("recording");
 
-        AudioDevice dev = recording
+        using AudioDevice? dev = recording
             ? audio.GetDefaultRecordingDevice(comm)
             : audio.GetDefaultPlaybackDevice(comm);
 
@@ -124,7 +133,7 @@ internal static class Program
             return 1;
         }
 
-        AudioDevice target = ResolveSelector(audio, o);
+        using AudioDevice? target = ResolveSelector(audio, o);
         if (target == null)
         {
             return 1;
@@ -133,20 +142,20 @@ internal static class Program
         audio.SetDefaultDevice(target, role);
         Console.WriteLine($"Set default ({role}):");
         // Re-read so the printed default flags reflect the change.
-        AudioDevice updated = audio.GetDevices().FirstOrDefault(d => d.Id == target.Id) ?? target;
-        PrintDevice(updated);
+        using AudioDevice? updated = audio.GetDeviceById(target.Id);
+        PrintDevice(updated ?? target);
         return 0;
     }
 
     private static int CmdVolume(AudioController audio, Options o)
     {
-        AudioDevice target = ResolveSelector(audio, o);
+        using AudioDevice? target = ResolveSelector(audio, o);
         if (target == null)
         {
             return 1;
         }
 
-        string setVal = o.Get("set");
+        string? setVal = o.Get("set");
         if (setVal == null)
         {
             Console.WriteLine($"{target.Name}: volume {target.GetVolumePercent():0}%");
@@ -167,13 +176,13 @@ internal static class Program
 
     private static int CmdMute(AudioController audio, Options o)
     {
-        AudioDevice target = ResolveSelector(audio, o);
+        using AudioDevice? target = ResolveSelector(audio, o);
         if (target == null)
         {
             return 1;
         }
 
-        string setVal = o.Get("set");
+        string? setVal = o.Get("set");
         if (setVal == null)
         {
             Console.WriteLine($"{target.Name}: muted={target.IsMuted}");
@@ -218,7 +227,7 @@ internal static class Program
         RenderDevices(devices);
 
         // Device: use the selector if one was given, otherwise the default playback device.
-        AudioDevice device;
+        AudioDevice? device;
         bool hasSelector = o.Get("name") != null || o.Get("id") != null;
         if (hasSelector)
         {
@@ -238,6 +247,7 @@ internal static class Program
             }
         }
 
+        using var ownedDevice = device;
         Console.WriteLine($"Watching audio sessions on:  {device.Name}, ID={device.Id}");
 
         // 1) Per-session events (the app / "System sounds" sliders in the mixer).
@@ -255,16 +265,14 @@ internal static class Program
         }
 
         // 2) Endpoint (device master) volume events (the "System -> Volume" slider).
-        //    This is a separate notification path (IAudioEndpointVolume), so subscribe to it too.
+        //    This is a separate notification path (IAudioEndpointVolume), so register on it too.
         AudioEndpointVolume endpointVolume = device.Volume;
-        AudioEndpointVolumeNotificationDelegate endpointHandler = data =>
-            Console.WriteLine(
-                $"[endpoint: {device.Name}] master={data.MasterVolume:P0} muted={data.Muted} channels={data.Channels}");
-        endpointVolume.OnVolumeNotification += endpointHandler;
+        using IDisposable endpointRegistration =
+            endpointVolume.RegisterVolumeNotification(new EndpointVolumeLogger(device.Name));
 
         // 3) Device (endpoint) change events, incl. default / default-communications device changes.
         //    This is registered on the controller (IMMNotificationClient), independent of any device.
-        IDisposable deviceRegistration = audio.RegisterDeviceNotification(new AudioDeviceLogger());
+        using IDisposable deviceRegistration = audio.RegisterDeviceNotification(new AudioDeviceLogger());
 
         Console.WriteLine(
             $"Registered on {registrations.Count} session(s) + endpoint master volume + device events. " +
@@ -273,11 +281,17 @@ internal static class Program
         Console.ReadLine();
 
         deviceRegistration.Dispose();
-        endpointVolume.OnVolumeNotification -= endpointHandler;
+        endpointRegistration.Dispose();
         foreach (IDisposable registration in registrations)
         {
-            try { registration.Dispose(); }
-            catch { /* best-effort cleanup */ }
+            try
+            {
+                registration.Dispose();
+            }
+            catch (Exception ex)
+            {
+                Trace.TraceError("Session notification cleanup failed: {0}", ex);
+            }
         }
 
         Console.WriteLine("Unregistered. Done.");
@@ -285,49 +299,36 @@ internal static class Program
     }
 
     // Resolves a device from --name / --id (+ --recording to scope --name).
-    private static AudioDevice ResolveSelector(AudioController audio, Options o)
+    private static AudioDevice? ResolveSelector(AudioController audio, Options o)
     {
-        bool recording = o.Has("recording");
-        IReadOnlyList<AudioDevice> scope = recording ? audio.GetRecordingDevices() : audio.GetPlaybackDevices();
-
-        string id = o.Get("id");
-        string name = o.Get("name");
-
-        int provided = (id != null ? 1 : 0) + (name != null ? 1 : 0);
-        if (provided == 0)
+        string? id = o.Get("id");
+        string? name = o.Get("name");
+        if ((id == null) == (name == null))
         {
-            Console.Error.WriteLine("Missing selector. Use one of: --name <substr> | --id <id>");
+            Console.Error.WriteLine("Use exactly one selector: --name <substr> or --id <id>.");
             return null;
         }
-        if (provided > 1)
-        {
-            Console.Error.WriteLine("Use only one selector (--name or --id).");
-            return null;
-        }
-
-        AudioDevice match = null;
         if (id != null)
         {
-            // --id searches across all devices (ID is globally unique).
-            match = audio.GetDevices().FirstOrDefault(d =>
-                string.Equals(d.Id, id, StringComparison.OrdinalIgnoreCase));
-            if (match == null)
-            {
-                Console.Error.WriteLine("No device found with ID: " + id);
-            }
+            return audio.GetDeviceById(id);
         }
-        else
+        var scope = o.Has("recording") ? audio.GetRecordingDevices() : audio.GetPlaybackDevices();
+        AudioDevice? match = null;
+        try
         {
-            match = scope.FirstOrDefault(d =>
-                d.Name != null && d.Name.IndexOf(name, StringComparison.OrdinalIgnoreCase) >= 0);
-            if (match == null)
+            match = scope.FirstOrDefault(d => d.Name.IndexOf(name ?? throw new InvalidOperationException("Missing name selector"), StringComparison.OrdinalIgnoreCase) >= 0);
+            return match;
+        }
+        finally
+        {
+            foreach (var candidate in scope)
             {
-                Console.Error.WriteLine(string.Format("No {0} device found matching name: {1}",
-                    recording ? "recording" : "playback", name));
+                if (!ReferenceEquals(candidate, match))
+                {
+                    candidate.Dispose();
+                }
             }
         }
-
-        return match;
     }
 
     private static bool TryGetRole(Options o, out DefaultRole role)
@@ -336,7 +337,7 @@ internal static class Program
 
         bool defaultOnly = o.Has("default-only");
         bool commOnly = o.Has("comm-only");
-        string roleStr = o.Get("role");
+        string? roleStr = o.Get("role");
 
         if (defaultOnly && commOnly)
         {
@@ -410,12 +411,18 @@ internal static class Program
         }
 
         Console.WriteLine("-- Defaults --");
-        AudioDeviceInfo defPlayback = AudioController.GetDefaultPlayback();
-        AudioDeviceInfo defRecording = AudioController.GetDefaultRecording();
-        Console.WriteLine($"  playback : {defPlayback.Name}");
-        Console.WriteLine($"             {defPlayback.Id}");
-        Console.WriteLine($"  recording: {defRecording.Name}");
-        Console.WriteLine($"             {defRecording.Id}");
+        AudioDeviceInfo? defPlayback = AudioController.GetDefaultPlayback();
+        AudioDeviceInfo? defRecording = AudioController.GetDefaultRecording();
+        Console.WriteLine($"  playback : {defPlayback?.Name}");
+        Console.WriteLine($"             {defPlayback?.Id}");
+        Console.WriteLine($"  recording: {defRecording?.Name}");
+        Console.WriteLine($"             {defRecording?.Id}");
+
+        if (defPlayback is null)
+        {
+            Console.Error.WriteLine("No default playback endpoint for volume checks.");
+            return 1;
+        }
 
         Console.WriteLine("-- Volume (default playback) --");
         float volume = AudioController.GetVolume();
@@ -444,7 +451,7 @@ internal static class Program
         Console.WriteLine($"  restored volume={AudioController.GetVolume(id):0}%  muted={AudioController.IsMuted(id)}");
 
         Console.WriteLine("-- Error paths --");
-        Console.WriteLine($"  GetVolume(null)  -> {Expect<ArgumentNullException>(() => AudioController.GetVolume(null))}");
+        Console.WriteLine($"  GetVolume(null!)  -> {Expect<ArgumentNullException>(() => AudioController.GetVolume(null!))}");
         Console.WriteLine($"  GetVolume(\"nope\") -> {Expect<Exception>(() => AudioController.GetVolume("nope"))}");
         Console.WriteLine($"  SetDefaultPlaybackByName(\"zzzz\") -> result: {AudioController.SetDefaultPlaybackByName("zzzz")}");
 
@@ -554,7 +561,7 @@ internal static class Program
         public bool Has(string key) { return _map.ContainsKey(key); }
 
         // Returns the value, or null if the key was not supplied.
-        public string Get(string key)
+        public string? Get(string key)
         {
             return _map.TryGetValue(key, out var v) ? v : null;
         }

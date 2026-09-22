@@ -1,4 +1,4 @@
-/*
+﻿/*
   LICENSE
   -------
   Copyright (C) 2007-2010 Ray Molenkamp
@@ -28,40 +28,32 @@
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
-    documentation comments.
+  The changes are summarized in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 using System;
+using System.Collections.Generic;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
 /// <summary>Immutable snapshot of an endpoint's volume state delivered with a volume-change notification.</summary>
-public class AudioVolumeNotificationData
+public sealed record AudioVolumeNotificationData
 {
-    private Guid _EventContext;
-    private bool _Muted;
-    private float _MasterVolume;
-    private int _Channels;
-    private float[] _ChannelVolume;
-
     /// <summary>Gets the context GUID identifying the caller that triggered the change, if any.</summary>
-    public Guid EventContext => _EventContext;
+    public Guid EventContext { get; }
 
     /// <summary>Gets a value indicating whether the endpoint is muted.</summary>
-    public bool Muted => _Muted;
+    public bool Muted { get; }
 
     /// <summary>Gets the master volume as a normalized scalar in the range 0.0 to 1.0.</summary>
-    public float MasterVolume => _MasterVolume;
+    public float MasterVolume { get; }
 
     /// <summary>Gets the number of channels reported in <see cref="ChannelVolume"/>.</summary>
-    public int Channels => _Channels;
+    public int Channels { get; }
 
     /// <summary>Gets the per-channel volume scalars, each in the range 0.0 to 1.0.</summary>
-    public float[] ChannelVolume => _ChannelVolume;
+    public IReadOnlyList<float> ChannelVolume { get; }
 
     /// <summary>Creates a new volume notification data snapshot.</summary>
     /// <param name="eventContext">The context GUID of the caller that triggered the change.</param>
@@ -70,10 +62,12 @@ public class AudioVolumeNotificationData
     /// <param name="channelVolume">The per-channel volume scalars; its length determines <see cref="Channels"/>.</param>
     public AudioVolumeNotificationData(Guid eventContext, bool muted, float masterVolume, float[] channelVolume)
     {
-        _EventContext = eventContext;
-        _Muted = muted;
-        _MasterVolume = masterVolume;
-        _Channels = channelVolume.Length;
-        _ChannelVolume = channelVolume;
+        InteropUtils.RequireNotNull(channelVolume, nameof(channelVolume));
+
+        EventContext = eventContext;
+        Muted = muted;
+        MasterVolume = masterVolume;
+        Channels = channelVolume.Length;
+        ChannelVolume = Array.AsReadOnly((float[])channelVolume.Clone());
     }
 }

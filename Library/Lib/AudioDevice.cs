@@ -1,4 +1,4 @@
-/*
+﻿/*
   LICENSE
   -------
   Copyright (C) 2007-2010 Ray Molenkamp
@@ -28,18 +28,8 @@
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
 
-  Changes from the original:
-  - `MMDevice` and the AudioDeviceCmdlets-derived `AudioDevice` were merged into this single type,
-    which now holds the `IMMDevice` directly. `CoreAudioApi/MMDevice.cs` no longer exists.
-  - Namespace changed to `AudioDeviceLib.Lib` (file-scoped); unused `using` directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
-    documentation comments.
-  - Implements `IDisposable` with a `_disposed` flag and a `ThrowIfDisposed()` guard.
-  - `FriendlyName`/`ID`/`DataFlow`/`State` became the snapshot properties `Name`/`Id`/`Kind`/`State`,
-    captured once at construction rather than re-read from COM on every access.
-  - `AudioEndpointVolume`/`AudioSessionManager`/`AudioMeterInformation` exposed as
-    `Volume`/`SessionManager`/`Meter`.
-  - `EStgmAccess`/`EDataFlow`/`EDeviceState` renamed to `StgmAccess`/`DataFlow`/`DeviceState`.
+  The changes are summarized in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 /*
@@ -59,7 +49,7 @@ using AudioDeviceLib.CoreAudioApi;
 using AudioDeviceLib.CoreAudioApi.Interfaces;
 using JetBrains.Annotations;
 
-namespace AudioDeviceLib.Lib;
+namespace AudioDeviceLib;
 
 /// <summary>
 /// A single Windows audio endpoint: its identity, its state, and its volume, metering and session
@@ -68,31 +58,47 @@ namespace AudioDeviceLib.Lib;
 /// <remarks>
 /// <para>
 /// Identity (<see cref="Id"/>, <see cref="Name"/>, <see cref="Kind"/>) and <see cref="State"/> are
-/// captured when the instance is created and cost nothing to read afterwards. Call
-/// <see cref="Refresh"/> to re-read them, or register for change notifications with
+/// captured when the instance is created and cost nothing to read afterward. Call
+/// <see cref="Refresh"/> to re-read them or register for change notifications with
 /// <see cref="AudioController.RegisterDeviceNotification"/>.
 /// </para>
 /// <para>
 /// Dispose an instance once you are done with it. That tears down any endpoint-volume or session
-/// callbacks it activated; the identity snapshot stays readable afterwards, but every other member
+/// callbacks it activated; the identity snapshot stays readable afterward, but every other member
 /// throws <see cref="ObjectDisposedException"/>.
+/// </para>
+/// <para>
+/// <see cref="Volume"/>, <see cref="SessionManager"/>, <see cref="Meter"/> and
+/// <see cref="Properties"/> activate their underlying Core Audio interface on first access, and
+/// doing so is thread-safe: concurrent first readers all receive the same instance, and
+/// <see cref="Dispose"/> is synchronized against them. This matters because device notifications
+/// are documented to arrive on arbitrary threads and concurrently, so reading a device's volume
+/// from a notification callback is a normal thing to do.
 /// </para>
 /// </remarks>
 [PublicAPI]
-public sealed class AudioDevice : IDisposable
+public sealed class AudioDevice : IDisposable, IEquatable<AudioDevice>
 {
-    private static Guid IID_IAudioMeterInformation = typeof(IAudioMeterInformation).GUID;
-    private static Guid IID_IAudioEndpointVolume = typeof(IAudioEndpointVolume).GUID;
-    private static Guid IID_IAudioSessionManager = typeof(IAudioSessionManager2).GUID;
+    // ReSharper disable InconsistentNaming
+    private static Guid IID_IAudioMeterInformation = typeof(IAudioMeterInformationCOM).GUID;
+    private static Guid IID_IAudioEndpointVolume = typeof(IAudioEndpointVolumeCOM).GUID;
+    private static Guid IID_IAudioSessionManager = typeof(IAudioSessionManager2COM).GUID;
+    // ReSharper restore InconsistentNaming
 
-    private readonly IMMDevice _realDevice;
+    private readonly IMMDeviceCOM _device;
 
-    private PropertyStore _propertyStore;
-    private AudioMeterInformation _meter;
-    private AudioEndpointVolume _volume;
-    private AudioSessionManager _sessionManager;
+    private PropertyStore? _propertyStore;
+    private AudioMeterInformation? _meter;
+    private AudioEndpointVolume? _volume;
+    private AudioSessionManager? _sessionManager;
+    
+    // Guards disposal state and all lazily activated members.
+    // Activation occurs under the lock to avoid creating duplicate COM wrappers,
+    // which could leave orphaned notification registrations.
+    private readonly object _activationLock = new object();
 
-    private bool _disposed;
+    // Volatile ensures disposal is visible to Refresh, which reads the flag without _activationLock.
+    private volatile bool _disposed;
 
     /// <summary>True if this endpoint is the current default device for its kind (multimedia role).</summary>
     public bool IsDefault { get; internal set; }
@@ -115,14 +121,9 @@ public sealed class AudioDevice : IDisposable
     /// <summary>Gets whether the endpoint was active as of construction or the last <see cref="Refresh"/>.</summary>
     public bool IsActive => State == DeviceState.Active;
 
-    internal AudioDevice(IMMDevice realDevice, bool isDefault, bool isDefaultCommunication)
+    internal AudioDevice(IMMDeviceCOM device, bool isDefault, bool isDefaultCommunication)
     {
-        if (realDevice == null)
-        {
-            throw new ArgumentNullException(nameof(realDevice));
-        }
-
-        _realDevice = realDevice;
+        _device = device ?? throw new ArgumentNullException(nameof(device));
         IsDefault = isDefault;
         IsDefaultCommunication = isDefaultCommunication;
 
@@ -133,76 +134,78 @@ public sealed class AudioDevice : IDisposable
     }
 
     /// <summary>Gets the volume and mute control for this endpoint (activated on first access).</summary>
-    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed of.</exception>
     /// <exception cref="COMException">Thrown when the interface cannot be activated.</exception>
     public AudioEndpointVolume Volume
     {
         get
         {
-            ThrowIfDisposed();
-            if (_volume == null)
+            lock (_activationLock)
             {
-                Marshal.ThrowExceptionForHR(_realDevice.Activate(ref IID_IAudioEndpointVolume, CLSCTX.ALL,
-                    IntPtr.Zero, out var result));
-                _volume = new AudioEndpointVolume(result as IAudioEndpointVolume);
-            }
+                ThrowIfDisposed();
+                if (_volume == null)
+                {
+                    InteropUtils.ThrowIfFailed(_device.Activate(ref IID_IAudioEndpointVolume, CLSCTX.ALL,
+                        IntPtr.Zero, out var result));
+                    _volume = new AudioEndpointVolume((result as IAudioEndpointVolumeCOM)!);
+                }
 
-            return _volume;
+                return _volume;
+            }
         }
     }
 
     /// <summary>Gets the audio session manager for this endpoint (activated on first access).</summary>
-    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed of.</exception>
     /// <exception cref="COMException">Thrown when the interface cannot be activated.</exception>
     public AudioSessionManager SessionManager
     {
         get
         {
-            ThrowIfDisposed();
-            if (_sessionManager == null)
+            lock (_activationLock)
             {
-                Marshal.ThrowExceptionForHR(_realDevice.Activate(ref IID_IAudioSessionManager, CLSCTX.ALL,
-                    IntPtr.Zero, out var result));
-                _sessionManager = new AudioSessionManager(result as IAudioSessionManager2);
-            }
+                ThrowIfDisposed();
+                if (_sessionManager == null)
+                {
+                    InteropUtils.ThrowIfFailed(_device.Activate(ref IID_IAudioSessionManager, CLSCTX.ALL,
+                        IntPtr.Zero, out var result));
+                    _sessionManager = new AudioSessionManager((result as IAudioSessionManager2COM)!);
+                }
 
-            return _sessionManager;
+                return _sessionManager;
+            }
         }
     }
 
     /// <summary>Gets the peak-meter information for this endpoint (activated on first access).</summary>
-    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed of.</exception>
     /// <exception cref="COMException">Thrown when the interface cannot be activated.</exception>
     public AudioMeterInformation Meter
     {
         get
         {
-            ThrowIfDisposed();
-            if (_meter == null)
+            lock (_activationLock)
             {
-                Marshal.ThrowExceptionForHR(_realDevice.Activate(ref IID_IAudioMeterInformation, CLSCTX.ALL,
-                    IntPtr.Zero, out var result));
-                _meter = new AudioMeterInformation(result as IAudioMeterInformation);
-            }
+                ThrowIfDisposed();
+                if (_meter == null)
+                {
+                    InteropUtils.ThrowIfFailed(_device.Activate(ref IID_IAudioMeterInformation, CLSCTX.ALL,
+                        IntPtr.Zero, out var result));
+                    _meter = new AudioMeterInformation((result as IAudioMeterInformationCOM)!);
+                }
 
-            return _meter;
+                return _meter;
+            }
         }
     }
 
     /// <summary>Gets the property store for this endpoint (opened on first access).</summary>
-    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed of.</exception>
     /// <exception cref="COMException">Thrown when the property store cannot be opened.</exception>
-    public PropertyStore Properties
-    {
-        get
-        {
-            ThrowIfDisposed();
-            return PropertyStoreCore;
-        }
-    }
+    public PropertyStore Properties => PropertyStoreCore;
 
     /// <summary>Re-reads <see cref="Name"/> and <see cref="State"/> from the endpoint.</summary>
-    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed of.</exception>
     /// <exception cref="COMException">Thrown when the underlying Core Audio call fails.</exception>
     public void Refresh()
     {
@@ -220,7 +223,7 @@ public sealed class AudioDevice : IDisposable
 
     /// <summary>Master volume as a percentage in the range 0..100.</summary>
     /// <returns>The current master volume scalar expressed as a percentage between 0 and 100.</returns>
-    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed of.</exception>
     public float GetVolumePercent()
     {
         return Volume.MasterVolumeLevelScalar * 100f;
@@ -228,10 +231,10 @@ public sealed class AudioDevice : IDisposable
 
     /// <summary>Sets master volume from a percentage in the range 0..100 (values are clamped).</summary>
     /// <param name="percent">
-    /// The desired master volume as a percentage. Values below 0 are clamped to 0 and values above
+    /// The desired master volume as a percentage. Values below 0 are clamped to 0, and values above
     /// 100 are clamped to 100.
     /// </param>
-    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed of.</exception>
     public void SetVolumePercent(float percent)
     {
         if (percent < 0f)
@@ -248,7 +251,7 @@ public sealed class AudioDevice : IDisposable
     }
 
     /// <summary>Gets or sets the mute state of the endpoint.</summary>
-    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed of.</exception>
     public bool IsMuted
     {
         get => Volume.Mute;
@@ -257,7 +260,7 @@ public sealed class AudioDevice : IDisposable
 
     /// <summary>Inverts the current mute state.</summary>
     /// <returns>The mute state after the change.</returns>
-    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed of.</exception>
     public bool ToggleMute()
     {
         AudioEndpointVolume volume = Volume;
@@ -268,7 +271,7 @@ public sealed class AudioDevice : IDisposable
 
     /// <summary>Instantaneous master peak level in the range 0..1 (0 when silent).</summary>
     /// <returns>The current master peak meter value between 0 (silent) and 1 (full scale).</returns>
-    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed.</exception>
+    /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed of.</exception>
     public float GetPeakValue()
     {
         return Meter.MasterPeakValue;
@@ -277,7 +280,7 @@ public sealed class AudioDevice : IDisposable
     /// <summary>Determines whether the given object is the same endpoint, compared by <see cref="Id"/>.</summary>
     /// <param name="obj">The object to compare with.</param>
     /// <returns><c>true</c> if <paramref name="obj"/> is an <see cref="AudioDevice"/> with the same ID.</returns>
-    public override bool Equals(object obj)
+    public override bool Equals(object? obj)
     {
         // Two wrappers for one endpoint are never reference-equal: Core Audio hands out a distinct
         // COM object per acquisition, so identity has to come from the endpoint ID.
@@ -285,11 +288,22 @@ public sealed class AudioDevice : IDisposable
                string.Equals(Id, other.Id, StringComparison.OrdinalIgnoreCase);
     }
 
+    /// <summary>Compares endpoint IDs without regard to case.</summary>
+    /// <param name="other">The endpoint to compare.</param>
+    /// <returns>Whether both instances identify the same endpoint.</returns>
+    public bool Equals(AudioDevice? other) => other is not null && StringComparer.OrdinalIgnoreCase.Equals(Id, other.Id);
+
+    /// <summary>Compares endpoint identities.</summary>
+    public static bool operator ==(AudioDevice? left, AudioDevice? right) => ReferenceEquals(left, right) || (left is not null && left.Equals(right));
+
+    /// <summary>Compares endpoint identities for inequality.</summary>
+    public static bool operator !=(AudioDevice? left, AudioDevice? right) => !(left == right);
+
     /// <summary>Serves as the hash function, derived from <see cref="Id"/>.</summary>
     /// <returns>A hash code for this endpoint.</returns>
     public override int GetHashCode()
     {
-        return Id == null ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(Id);
+        return StringComparer.OrdinalIgnoreCase.GetHashCode(Id);
     }
 
     /// <summary>Returns a human-readable description of this endpoint.</summary>
@@ -313,94 +327,93 @@ public sealed class AudioDevice : IDisposable
     /// </remarks>
     public void Dispose()
     {
-        if (_disposed)
+        AudioEndpointVolume? volume;
+        AudioSessionManager? sessionManager;
+
+        lock (_activationLock)
         {
-            return;
+            if (_disposed)
+            {
+                return;
+            }
+
+            _disposed = true;
+
+            // Detach COM-backed members under the lock, then dispose those requiring COM calls outside it
+            // to avoid blocking other access while preventing reactivation after disposal.
+            volume = _volume;
+            _volume = null;
+
+            sessionManager = _sessionManager;
+            _sessionManager = null;
+
+            _meter?.Dispose();
+            _meter = null;
+            _propertyStore?.Dispose();
+            _propertyStore = null;
         }
 
-        _disposed = true;
+        volume?.Dispose();
+        sessionManager?.Dispose();
 
-        _volume?.Dispose();
-        _volume = null;
-
-        _sessionManager?.Dispose();
-        _sessionManager = null;
-
-        _meter = null;
-        _propertyStore = null;
-
-        // The IMMDevice RCW is deliberately left to the CLR. Releasing it here would hand a consumer
-        // that disposes twice an InvalidComObjectException: the wrapper holds exactly one reference,
-        // so there is no slack to absorb the mistake.
+        // Leave the IMMDevice RCW to the CLR to avoid invalidating the shared wrapper on repeated disposal.
     }
 
-    // Bypasses the disposed guard so the constructor can populate the snapshot before the guard is
-    // meaningful, and so Refresh can reuse the store without re-checking.
+    // Centralizes synchronized property-store access for construction, Refresh, and Properties.
+    // Checks disposal under the lock to prevent a racing operation from reopening the store
+    // after Dispose has cleared it.
     private PropertyStore PropertyStoreCore
     {
         get
         {
-            if (_propertyStore == null)
+            lock (_activationLock)
             {
-                Marshal.ThrowExceptionForHR(_realDevice.OpenPropertyStore(StgmAccess.Read, out var store));
-                _propertyStore = new PropertyStore(store);
-            }
+                ThrowIfDisposed();
+                if (_propertyStore == null)
+                {
+                    InteropUtils.ThrowIfFailed(_device.OpenPropertyStore(StgmAccess.Read, out var store));
+                    _propertyStore = new PropertyStore(store);
+                }
 
-            return _propertyStore;
+                return _propertyStore;
+            }
         }
     }
 
     private string ReadId()
     {
-        Marshal.ThrowExceptionForHR(_realDevice.GetId(out var result));
+        InteropUtils.ThrowIfFailed(_device.GetId(out var result));
         return result;
     }
 
     private DeviceState ReadState()
     {
-        Marshal.ThrowExceptionForHR(_realDevice.GetState(out var result));
+        InteropUtils.ThrowIfFailed(_device.GetState(out var result));
         return result;
     }
 
     private DataFlow ReadDataFlow()
     {
-        var endpoint = _realDevice as IMMEndpoint;
+        // ReSharper disable once SuspiciousTypeConversion.Global
+        // NOTE: This cast is safe: the endpoint is get by doing QueryInterface for IMMEndpoint  
+        var endpoint = _device as IMMEndpointCOM;
         if (endpoint == null)
         {
             throw new InvalidOperationException("The endpoint does not implement IMMEndpoint.");
         }
 
-        endpoint.GetDataFlow(out var result);
+        InteropUtils.ThrowIfFailed(endpoint.GetDataFlow(out var result));
         return result;
     }
 
     private string ReadFriendlyName()
     {
-        // One OpenPropertyStore plus one GetValue. This deliberately avoids the PropertyStore
-        // indexers, which scan the whole store - a few hundred COM round trips per name, since
-        // FriendlyName sits near the end of the enumeration order.
-        bool found = PropertyStoreCore.TryGetValue(
-            PKEY.PKEY_DeviceInterface_FriendlyName, out PropVariant value);
-
-        try
-        {
-            // A present-but-unexpected variant type yields null from Value rather than a string, so
-            // the fallback covers that case too.
-            return found ? (value.Value as string ?? "Unknown") : "Unknown";
-        }
-        finally
-        {
-            // The variant is this method's to release; without it every name read leaks its string,
-            // and a name is read for every device on every enumeration.
-            value.Clear();
-        }
+        bool found = PropertyStoreCore.TryGetValue(PKEY.DeviceFriendlyName, out var value);
+        return found ? (value.Value as string ?? string.Empty) : string.Empty;
     }
 
     private void ThrowIfDisposed()
     {
-        if (_disposed)
-        {
-            throw new ObjectDisposedException(nameof(AudioDevice));
-        }
+        InteropUtils.RequireNotDisposed(_disposed, this);
     }
 }

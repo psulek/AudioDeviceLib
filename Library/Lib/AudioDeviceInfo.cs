@@ -1,4 +1,4 @@
-/*
+﻿/*
   Copyright (c) 2026 Peter Šulek
   MIT License
 
@@ -10,7 +10,7 @@
 using System;
 using AudioDeviceLib.CoreAudioApi;
 
-namespace AudioDeviceLib.Lib;
+namespace AudioDeviceLib;
 
 /// <summary>
 /// An immutable snapshot of an <see cref="AudioDevice"/>'s identifying information, detached from the
@@ -18,10 +18,10 @@ namespace AudioDeviceLib.Lib;
 /// </summary>
 /// <remarks>
 /// All properties are captured when the snapshot is taken and never change, so an instance is safe to
-/// read from any thread, keep, or store — including after the originating <see cref="AudioDevice"/>
+/// read from any thread, keep, or store - including after the originating <see cref="AudioDevice"/>
 /// has been disposed.
 /// </remarks>
-public sealed class AudioDeviceInfo
+public sealed record AudioDeviceInfo
 {
     /// <summary>True if this endpoint is the current default device for its kind (multimedia role).</summary>
     public bool IsDefault { get; }
@@ -43,28 +43,26 @@ public sealed class AudioDeviceInfo
     
     internal AudioDeviceInfo(string id, string name, AudioDeviceKind kind, DeviceState state, bool isDefault, bool isDefaultCommunication)
     {
-        Id = id;
-        Name = name;
+        // ReSharper disable NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract
+        Id = id ?? string.Empty;
+        Name = name ?? string.Empty;
+        // ReSharper restore NullCoalescingConditionIsAlwaysNotNullAccordingToAPIContract
         Kind = kind;
         State = state;
         IsDefault = isDefault;
         IsDefaultCommunication = isDefaultCommunication;
     }
 
-    /// <summary>Determines whether the given object describes the same endpoint, compared by <see cref="Id"/>.</summary>
-    /// <param name="obj">The object to compare with.</param>
-    /// <returns><c>true</c> if <paramref name="obj"/> is an <see cref="AudioDeviceInfo"/> with the same ID.</returns>
-    public override bool Equals(object obj)
-    {
-        return obj is AudioDeviceInfo other &&
-               string.Equals(Id, other.Id, StringComparison.OrdinalIgnoreCase);
-    }
+    /// <summary>Compares endpoint IDs without regard to case.</summary>
+    /// <param name="other">The endpoint to compare.</param>
+    /// <returns>Whether both instances identify the same endpoint.</returns>
+    public bool Equals(AudioDeviceInfo? other) => other is not null && StringComparer.OrdinalIgnoreCase.Equals(Id, other.Id);
 
     /// <summary>Serves as the hash function, derived from <see cref="Id"/>.</summary>
     /// <returns>A hash code for this endpoint snapshot.</returns>
     public override int GetHashCode()
     {
-        return Id == null ? 0 : StringComparer.OrdinalIgnoreCase.GetHashCode(Id);
+        return StringComparer.OrdinalIgnoreCase.GetHashCode(Id);
     }
 
     /// <summary>Returns a human-readable description of this endpoint.</summary>

@@ -1,4 +1,4 @@
-/*
+﻿/*
   LICENSE
   -------
   Copyright (C) 2007-2010 Ray Molenkamp
@@ -28,32 +28,25 @@
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
-    documentation comments.
-  - The indexer now yields `AudioDeviceLib.Lib.AudioDevice`, the merged device type, instead of the
-    removed `MMDevice`.
-  - `Count` is read from COM once and cached; the underlying collection is a snapshot of a single
-    enumeration and cannot change.
-  - The indexer now checks the HRESULT from `IMMDeviceCollection::Item` instead of discarding it.
-  - Implements `IDisposable`, releasing the `IMMDeviceCollection` RCW.
+  The changes are summarized in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 using System;
 using System.Runtime.InteropServices;
+using System.Threading;
 using AudioDeviceLib.CoreAudioApi.Interfaces;
-using AudioDeviceLib.Lib;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
 /// <summary>A read-only collection of <see cref="AudioDevice"/> audio endpoints returned by an enumeration.</summary>
-internal class MMDeviceCollection : IDisposable
+internal sealed class MMDeviceCollection : IDisposable
 {
-    private IMMDeviceCollection _MMDeviceCollection;
+    private IMMDeviceCollectionCOM? _mmDeviceCollection;
     private int _count = -1;
-    private bool _disposed;
+    // 0 = live, 1 = disposed. CompareExchange ensures only one caller releases the COM wrapper;
+    // Volatile.Read makes disposal visible to concurrent guards.
+    private int _disposed;
 
     /// <summary>Gets the number of endpoints in the collection.</summary>
     /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed.</exception>
@@ -69,7 +62,8 @@ internal class MMDeviceCollection : IDisposable
             // condition a COM round trip.
             if (_count < 0)
             {
-                Marshal.ThrowExceptionForHR(_MMDeviceCollection.GetCount(out var result));
+                // Non-null until Dispose clears it, which ThrowIfDisposed above has ruled out.
+                InteropUtils.ThrowIfFailed(_mmDeviceCollection!.GetCount(out var result));
                 _count = (int)result;
             }
 
@@ -81,7 +75,8 @@ internal class MMDeviceCollection : IDisposable
     /// <param name="index">The zero-based index of the endpoint to retrieve (0 to <see cref="Count"/> - 1).</param>
     /// <returns>A new <see cref="AudioDevice"/> for the endpoint at the requested position.</returns>
     /// <exception cref="ObjectDisposedException">Thrown when this instance has been disposed.</exception>
-    /// <exception cref="COMException">Thrown when the index is out of range or the call fails.</exception>
+    /// <exception cref="ArgumentOutOfRangeException">Thrown when the index is outside this snapshot.</exception>
+    /// <exception cref="COMException">Thrown when the underlying Core Audio call fails.</exception>
     /// <remarks>
     /// Each access returns a new instance wrapping its own COM endpoint object; the caller owns it
     /// and is responsible for disposing it. The collection intentionally keeps no reference, so
@@ -92,49 +87,55 @@ internal class MMDeviceCollection : IDisposable
         get
         {
             ThrowIfDisposed();
-            Marshal.ThrowExceptionForHR(_MMDeviceCollection.Item((uint)index, out IMMDevice result));
-            return new AudioDevice(result, false, false);
+            // Non-null until Dispose clears it, which ThrowIfDisposed above has ruled out.
+            if (index < 0 || index >= Count)
+            {
+                throw new ArgumentOutOfRangeException(nameof(index));
+            }
+
+            InteropUtils.ThrowIfFailed(_mmDeviceCollection!.Item((uint)index, out IMMDeviceCOM device));
+            return new AudioDevice(device, false, false);
         }
     }
 
-    internal MMDeviceCollection(IMMDeviceCollection parent)
+    internal MMDeviceCollection(IMMDeviceCollectionCOM parent)
     {
-        _MMDeviceCollection = parent;
+        _mmDeviceCollection = parent;
     }
+
+    private bool IsDisposed => Volatile.Read(ref _disposed) != 0;
 
     /// <summary>Releases the underlying Core Audio collection.</summary>
     /// <remarks>Devices already obtained from the indexer are unaffected and remain usable.</remarks>
     public void Dispose()
     {
-        if (_disposed)
+        // Atomic transition: the thread that flips 0 -> 1 owns the one-time release; any concurrent
+        // or repeat caller sees a non-zero prior value and returns without touching the wrapper.
+        if (Interlocked.CompareExchange(ref _disposed, 1, 0) != 0)
         {
             return;
         }
-
-        _disposed = true;
 
         // Safe to release deterministically: this RCW never leaves the library, so nothing else can
         // be holding it.
         try
         {
-            if (_MMDeviceCollection != null && Marshal.IsComObject(_MMDeviceCollection))
+            if (_mmDeviceCollection != null && Marshal.IsComObject(_mmDeviceCollection))
             {
-                Marshal.ReleaseComObject(_MMDeviceCollection);
+                Marshal.ReleaseComObject(_mmDeviceCollection);
             }
         }
-        catch
+        catch (Exception cleanupException)
         {
+            InteropUtils.ReportFailure(cleanupException);
             // best-effort cleanup
         }
 
-        _MMDeviceCollection = null;
+        _mmDeviceCollection = null;
     }
 
     private void ThrowIfDisposed()
     {
-        if (_disposed)
-        {
-            throw new ObjectDisposedException(nameof(MMDeviceCollection));
-        }
+        InteropUtils.RequireNotDisposed(IsDisposed, this);
     }
 }

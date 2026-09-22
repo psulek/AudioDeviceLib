@@ -1,0 +1,137 @@
+name: Build, test and quality
+description: >
+  Shared pipeline for the CI and publish workflows: set up .NET, run the slopwatch quality
+  gate, optionally build the whole solution, run the unit tests (optionally with coverage),
+  and render the test + quality (+ coverage) summaries onto the job page.
+
+inputs:
+  dotnet-version:
+    description: >
+      Extra .NET runtime to install alongside the SDK pinned by global.json. The net7.0-windows
+      test leg is what exercises the shipped netstandard2.0 asset, so it needs a 7.0 runtime.
+    required: false
+    default: 7.0.x
+  run-build:
+    description: >
+      'true' builds the whole solution first and runs the tests with --no-build; 'false' lets the
+      test step build the test project implicitly.
+    required: false
+    default: 'false'
+  collect-coverage:
+    description: "'true' collects code coverage and publishes a coverage report + summary."
+    required: false
+    default: 'false'
+
+runs:
+  using: composite
+  steps:
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v5
+      with:
+        global-json-file: global.json
+        dotnet-version: ${{ inputs.dotnet-version }}
+
+    - name: Restore quality tools
+      shell: pwsh
+      run: dotnet tool restore
+
+    - name: Check code quality
+      shell: pwsh
+      run: dotnet slopwatch analyze --fail-on warning
+
+    - name: Build
+      if: inputs.run-build == 'true'
+      shell: pwsh
+      run: dotnet build AudioDeviceLib.slnx -c Release
+
+    # `LogFilePrefix` rather than `LogFileName`: the three target-framework legs each write their
+    # own pair of files, and a fixed name would have them overwrite each other. The prefix form
+    # stamps the framework into the name (results_net48_<timestamp>.trx/.html).
+    - name: Test
+      shell: pwsh
+      run: dotnet test Library.UnitTests/Library.UnitTests.csproj -c Release -m:1 ${{ inputs.run-build == 'true' && '--no-build' || '' }} --logger "trx;LogFilePrefix=results" --logger "html;LogFilePrefix=results" ${{ inputs.collect-coverage == 'true' && '--settings coverage.runsettings --collect:"XPlat Code Coverage"' || '' }} --results-directory test-results
+
+    # `always()` from here on: a red run is exactly when the reports are worth reading.
+    - name: Coverage report
+      if: always() && inputs.collect-coverage == 'true'
+      shell: pwsh
+      run: dotnet reportgenerator -reports:"test-results/**/coverage.opencover.xml" -targetdir:"test-results/coverage" -reporttypes:"Html;TextSummary"
+
+    # Renders the three trx files onto the job page itself, so a failure is legible without
+    # downloading the artifact. One trx per target framework, each listed as its own suite.
+    - name: Test report
+      if: always()
+      uses: dorny/test-reporter@v3
+      with:
+        # `name` is a required input but titles only the check run, which this mode does not
+        # create; `report-title` is what actually heads the summary section.
+        name: Test results
+        report-title: Test results
+        path: test-results/*.trx
+        reporter: dotnet-trx
+        # The trx files are written on Windows, so the source paths inside them use backslashes.
+        path-replace-backslashes: 'true'
+        # Only failures are worth expanding - listing every passing test across three legs would
+        # bury the signal and push at the 1 MiB job-summary limit.
+        list-suites: failed
+        list-tests: failed
+        # The Test step above is the gate; this step only reports. Failing it too would just paint
+        # a second red X for the same cause, and `fail-on-empty` would fire whenever an earlier
+        # step (Build, or the quality gate) dies before any trx is written.
+        fail-on-error: 'false'
+        fail-on-empty: 'false'
+
+    - name: Coverage summary
+      if: always() && inputs.collect-coverage == 'true'
+      shell: pwsh
+      run: |
+        $coverage = 'test-results/coverage/Summary.txt'
+        if (Test-Path $coverage) {
+          (@('## Coverage', '', '```') + (Get-Content -LiteralPath $coverage) + '```') -join "`n" |
+            Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+        }
+
+    # Re-runs the analyzer for its JSON so the numbers land on the job page next to the tests.
+    # A second scan rather than reusing the gate's output: the gate prints console text, which is
+    # what makes a red step readable in the log, and the scan takes about a second.
+    - name: Quality summary
+      if: always()
+      shell: pwsh
+      run: |
+        New-Item -ItemType Directory -Force -Path test-results | Out-Null
+        $slop = 'test-results/slopwatch.json'
+        dotnet slopwatch analyze --output json > $slop
+        $global:LASTEXITCODE = 0
+
+        $lines = @('## Code quality', '')
+        if (-not (Test-Path $slop)) {
+          $lines += '_Slopwatch produced no output._'
+        }
+        else {
+          $r = Get-Content -LiteralPath $slop -Raw | ConvertFrom-Json
+          $baselined = 0
+          if (Test-Path '.slopwatch/baseline.json') {
+            $baselined = @((Get-Content -LiteralPath '.slopwatch/baseline.json' -Raw | ConvertFrom-Json).entries).Count
+          }
+          $verdict = if ($r.totalIssues -eq 0) { 'No new issues.' } else { "**$($r.totalIssues) new issue(s).**" }
+          $lines += "$verdict $($r.summary.errors) error, $($r.summary.warnings) warning, $($r.summary.info) info - $baselined baselined."
+          if ($r.totalIssues -gt 0) {
+            $lines += @('', '| Severity | Rule | Location | Message |', '| --- | --- | --- | --- |')
+            $root = (Get-Location).Path.Replace([char]92, [char]47).TrimEnd('/') + '/'
+            foreach ($i in ($r.results | Sort-Object severity, filePath, lineNumber)) {
+              $f = $i.filePath.Replace([char]92, [char]47)
+              if ($f.StartsWith($root, [System.StringComparison]::OrdinalIgnoreCase)) { $f = $f.Substring($root.Length) }
+              $msg = $i.message.Replace('|', '\|')
+              $lines += "| $($i.severity) | $($i.ruleId) $($i.ruleName) | ``$($f):$($i.lineNumber)`` | $msg |"
+            }
+          }
+        }
+        $lines -join "`n" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append -Encoding utf8
+        exit 0
+
+    - name: Upload test results
+      if: always()
+      uses: actions/upload-artifact@v6
+      with:
+        name: test-results
+        path: test-results

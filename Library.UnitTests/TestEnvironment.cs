@@ -10,7 +10,6 @@
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
-using AudioDeviceLib.Lib;
 using NUnit.Framework;
 
 namespace AudioDeviceLib.UnitTests;

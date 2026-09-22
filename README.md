@@ -1,355 +1,187 @@
 # AudioDeviceLib
 
-A small, dependency-free **.NET** library for Windows that lists audio endpoints
-and sets the default playback/recording device, plus volume and mute control.
+[![CI](https://github.com/psulek/AudioDeviceLib/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/psulek/AudioDeviceLib/actions/workflows/ci.yml)
 
-It replaces the need to host PowerShell and the third-party `AudioDeviceCmdlets`
-module: the same Core Audio (WASAPI) interop is called directly from managed code.
+[![NuGet](https://img.shields.io/nuget/vpre/AudioDeviceLib.svg)](https://www.nuget.org/packages/AudioDeviceLib)
+[![Downloads](https://img.shields.io/nuget/dt/AudioDeviceLib.svg)](https://www.nuget.org/packages/AudioDeviceLib)
 
-- Target frameworks: `net48`, `netstandard2.0`, `net8.0-windows`
-- No NuGet dependencies (pure COM interop).
-- Windows only.
+A small .NET library for Windows audio devices. Enumerate playback and recording
+endpoints, choose defaults, control volume and mute, and receive device and session
+notifications directly from C#.
 
-## Why
+[Documentation and API reference](https://psulek.github.io/AudioDeviceLib/)
 
-Switching the default output device on Windows has no public Win32 API. This library
-uses the same, well-established techniques as `AudioDeviceCmdlets`:
+## Table of contents
 
-- Enumeration via the documented Core Audio COM interfaces (`IMMDeviceEnumerator`, etc.).
-- Setting the default endpoint via the **undocumented** `IPolicyConfig` interface.
+- [Requirements](#requirements)
+- [Installation](#installation)
+- [Quick start](#quick-start)
+- [Working with devices](#working-with-devices)
+- [Notifications](#notifications)
+- [Lifetime and threading](#lifetime-and-threading)
+- [API](#api)
+- [Compatibility and diagnostics](#compatibility-and-diagnostics)
+- [Build and test](#build-and-test)
+- [Documentation](#documentation)
+- [License and credits](#license-and-credits)
 
-## Provenance & license
+## Requirements
 
-- Overall library: **MIT** (see `LICENSE`).
-- The `AudioController` / `AudioDevice` facade is derived from the MIT-licensed
-  [`AudioDeviceCmdlets`](https://github.com/frgnca/AudioDeviceCmdlets) by Francois Gendron.
-  The PowerShell cmdlet layer was **not** copied; it was replaced with a plain managed API.
-- The Core Audio (WASAPI) interop is the wrapper by Ray Molenkamp (zlib-style license).
-  Most of it lives under `CoreAudioApi/`; two files are in `Lib/`, because the original
-  `MMDevice` was merged into `Lib/AudioDevice.cs` and the original `MMDeviceEnumerator`
-  into `Lib/AudioController.cs`.
+- Windows with Core Audio support.
+- A compatible .NET runtime. The package targets `net48`, `netstandard2.0`, and
+  `net8.0-windows`; targeting .NET Standard does not make it cross-platform.
+- No runtime NuGet dependencies. Audio access uses Windows COM interop.
 
-See `THIRD-PARTY-NOTICES.md` for the full required notices.
+Use a normal JIT deployment. Native AOT and trimming are not supported.
 
-## Install
+## Installation
 
-```
+Install from [NuGet](https://www.nuget.org/packages/AudioDeviceLib):
+
+```sh
 dotnet add package AudioDeviceLib --prerelease
 ```
 
-The current release is `1.0.0-rc.2`, a release candidate. NuGet does not resolve prereleases by
-default, so the `--prerelease` flag is required — or pin it explicitly:
+The command includes prerelease versions. Import `AudioDeviceLib` for the main API
+and `AudioDeviceLib.CoreAudioApi` for volume, session, property, and event types.
 
-```xml
-<PackageReference Include="AudioDeviceLib" Version="1.0.0-rc.2" />
-```
+## Quick start
 
-## Usage
-
-There are two ways in: **static one-liners** for the common cases, and the **instance API**
-when you need live objects or repeated operations.
-
-### One-liners
-
-Each static call creates and disposes its own `AudioController` and device, so you own
-nothing and there is nothing to dispose. They hand back `AudioDeviceInfo`, an immutable
-snapshot, rather than a live `AudioDevice`.
+Static methods handle resource cleanup and return managed results. They are useful
+for occasional operations; use a controller instance for repeated work.
 
 ```csharp
-using AudioDeviceLib.Lib;
+using System;
+using AudioDeviceLib;
 
-// Defaults
-AudioDeviceInfo playback = AudioController.GetDefaultPlayback();
-AudioDeviceInfo recording = AudioController.GetDefaultRecording();
-Console.WriteLine(playback.Name);
-
-// Volume (0..100) and mute on the default playback device
-float volume = AudioController.GetVolume();
-AudioController.SetVolume(50f);
-bool muted = AudioController.IsMuted();
-AudioController.SetMute(false);
-bool nowMuted = AudioController.ToggleMute();
-
-// ...or on a specific endpoint
-AudioController.SetVolume(playback.Id, 25f);
-
-// Active endpoints, as snapshots
-IReadOnlyList<AudioDeviceInfo> all = AudioController.ListDevices();
-IReadOnlyList<AudioDeviceInfo> outputs = AudioController.ListDevices(AudioDeviceKind.Playback);
-
-// Make the first device whose name contains "Speakers" the default.
-// Returns null if nothing matches, so you can fall back or report clearly.
-AudioDeviceInfo set = AudioController.SetDefaultPlaybackByName("Speakers");
-if (set == null)
+foreach (var device in AudioController.ListDevices(AudioDeviceKind.Playback))
 {
-    Console.Error.WriteLine("No matching playback device found.");
+    Console.WriteLine(device);
+}
+
+var playback = AudioController.GetDefaultPlayback();
+if (playback != null)
+{
+    AudioController.SetVolume(playback.Id, 50f);
+    AudioController.SetMute(playback.Id, false);
 }
 ```
 
-These create a controller per call. For repeated work — polling, or several operations on
-the same device — use the instance API below.
+Convenience methods without a device ID operate on the default playback endpoint.
+Volume percentages use a range of 0-100; lower-level scalar APIs use 0-1.
 
-### Instance API
+## Working with devices
+
+Use a controller instance for repeated operations on a live device:
 
 ```csharp
-using AudioDeviceLib.Lib;
+using AudioDeviceLib;
 
-// AudioController is IDisposable — wrap it in a using so it is torn down deterministically.
 using var audio = new AudioController();
-
-// List active playback devices. AudioDevice is IDisposable; dispose what you enumerate.
-foreach (var d in audio.GetPlaybackDevices())
+using var device = audio.GetDefaultPlaybackDevice();
+if (device != null)
 {
-    Console.WriteLine(d); // "Speakers (Realtek...) (Playback) [Default]"
-    d.Dispose();
-}
-
-// Current default output.
-using (AudioDevice current = audio.GetDefaultPlaybackDevice())
-{
-    if (current != null)
-    {
-        // Volume / mute
-        current.SetVolumePercent(50f);
-        current.IsMuted = false;
-
-        // Set a specific device you already resolved (default = Multimedia + Communications)
-        audio.SetDefaultDevice(current);
-
-        // Or pick exactly which Windows roles to assign (flags can be combined)
-        audio.SetDefaultDevice(current, DefaultRole.Console | DefaultRole.Multimedia);
-        audio.SetDefaultDevice(current, DefaultRole.All);
-
-        // Detach an immutable snapshot you can keep after the device is disposed
-        AudioDeviceInfo snapshot = current.ToDeviceInfo();
-
-        // Volume, sessions, metering and the raw property store hang off the device
-        current.Volume.VolumeStepUp();
-        var sessions = current.SessionManager.Sessions;
-        float peak = current.GetPeakValue();
-    }
+    device.SetVolumePercent(50f);
+    device.IsMuted = false;
 }
 ```
 
-`Id`, `Name`, `Kind` and `State` are captured when the device is created, so reading them
-costs nothing and still works after the device is disposed. Call `Refresh()` to re-read
-`Name`/`State`, or register for device notifications (below) to be told when they change.
-Devices compare by endpoint ID, so `a.Equals(b)` is `true` for two handles on the same
-endpoint — reference equality never is.
+See [working with devices](https://psulek.github.io/AudioDeviceLib/articles/devices.html)
+for enumeration, snapshots, and default-device selection.
 
-`GetDevices` on the instance API also takes `DataFlowFilter` and `DeviceStateFilter`
-(in `AudioDeviceLib.CoreAudioApi`) if you need endpoints that are disabled, not present
-or unplugged — the static `ListDevices` returns active endpoints only.
+## Notifications
 
-To resolve one endpoint by ID, `GetDeviceById` returns a live `AudioDevice` and
-`GetDeviceInfo` an `AudioDeviceInfo` snapshot:
+Subscribe to device, volume, and session changes. See the
+[notifications guide](https://psulek.github.io/AudioDeviceLib/articles/notifications.html)
+for registration and examples.
 
-```csharp
-using (AudioDevice device = audio.GetDeviceById(id))
-{
-    bool active = device.IsActive; // shorthand for State == DeviceState.Active
-}
+## Lifetime and threading
 
-AudioDeviceInfo info = audio.GetDeviceInfo(id);
+Dispose live audio objects and handle callbacks safely. See
+[lifetime and threading](https://psulek.github.io/AudioDeviceLib/articles/lifetime.html)
+for ownership, cleanup, and callback rules.
+
+## API
+
+See the [full API reference](https://psulek.github.io/AudioDeviceLib/api/index.html)
+for public types, method signatures, overloads, and member documentation.
+
+The [quick start](#quick-start) demonstrates static methods, while
+[working with devices](#working-with-devices) demonstrates public instance methods.
+For more guidance, visit the [documentation website](https://psulek.github.io/AudioDeviceLib/).
+
+## Compatibility and diagnostics
+
+Device enumeration and audio controls use Windows Core Audio. Changing the default
+device depends on the undocumented policy-configuration interface and may be
+unsupported on some Windows configurations. COM must be available on the calling thread.
+
+Callback and cleanup failures are reported through `System.Diagnostics.Trace`.
+Configure a trace listener when you need diagnostic output.
+
+## Build and test
+
+Run from the repository root on Windows:
+
+```sh
+dotnet build AudioDeviceLib.slnx -c Release
+dotnet test Library.UnitTests/Library.UnitTests.csproj -c Release -m:1
 ```
 
-Both reject a null or empty ID with `ArgumentNullException`. A malformed ID throws
-`ArgumentException`; an ID that is well-formed but matches no endpoint throws `COMException`.
+Tests cover the three shipped assets through .NET Framework 4.8, .NET 7, and .NET 8
+hosts. The .NET 7 host exercises the .NET Standard asset. Run targets serially because
+hardware tests share the machine's audio devices.
 
-## Disposal
+Some integration tests change volume or mute and restore the previous settings.
+Session metadata tests create their own silent session. Tests that require an audio
+endpoint skip when none is available. Explicit race tests run separately:
 
-Types which implements `IDisposable`. Dispose each one you obtain, with `using` or by calling
-`.Dispose()`:
-
-- `AudioController`
-- `AudioDevice`
-- the token returned by `AudioController.RegisterDeviceNotification`
-- the token returned by `AudioSessionControl.RegisterAudioSessionNotification`
-
-Disposing an `AudioDevice` also disposes its `Volume` (`AudioEndpointVolume`),
-`SessionManager` (`AudioSessionManager`), `SessionManager.Sessions` (`SessionCollection`)
-and every `AudioSessionControl` in that collection.
-
-Disposing twice is a no-op. Afterwards, members that call into Core Audio throw
-`ObjectDisposedException` on both `AudioController` and `AudioDevice`; the `AudioDevice`
-identity snapshot (`Id`, `Name`, `Kind`, `State`, `ToDeviceInfo()`, `ToString()`,
-`Equals()`) stays readable.
-
-The static methods return `AudioDeviceInfo` snapshots and leave nothing to dispose.
-
-`PropVariant` is not `IDisposable` but owns native memory: call `.Clear()` on one returned by
-`PropertyStore.TryGetValue` or `PropertyStore.GetValue(int)`. The `PropertyStore` indexers return
-`PropertyStoreProperty`, which already does this.
-
-## Session notifications
-
-`RegisterAudioSessionNotification` returns an `IDisposable` token; wrap it in a `using`
-so the callback is unregistered deterministically when you are done listening.
-
-> **Threading:** callbacks are raised by Windows Core Audio on arbitrary, non-UI threads
-> and may arrive concurrently. Keep each handler fast and thread-safe.
-
-```csharp
-using AudioDeviceLib.Lib;
-using AudioDeviceLib.CoreAudioApi;
-
-// Implement the attribute-free contract for the events you care about. Every callback receives an
-// immutable AudioSessionInfo snapshot of the source session (identifiers, display name, icon path,
-// state), so one consumer can serve many sessions — and there is no live COM object to misuse from
-// the notification thread.
-sealed class SessionLogger : IAudioSessionEvents
-{
-    public void OnSimpleVolumeChanged(AudioSessionInfo session, float newVolume, bool newMute, Guid eventContext)
-    {
-        Console.WriteLine($"pid={session.ProcessID} volume={newVolume:P0} muted={newMute}");
-    }
-
-    public void OnStateChanged(AudioSessionInfo session, AudioSessionState newState)
-    {
-        Console.WriteLine($"pid={session.ProcessID} state={newState}");
-    }
-
-    // The remaining IAudioSessionEvents members can be left as no-ops.
-    public void OnDisplayNameChanged(AudioSessionInfo session, string newDisplayName, Guid eventContext) { }
-    public void OnIconPathChanged(AudioSessionInfo session, string newIconPath, Guid eventContext) { }
-    public void OnChannelVolumeChanged(AudioSessionInfo session, float[] newChannelVolumes, uint changedChannel, Guid eventContext) { }
-    public void OnGroupingParamChanged(AudioSessionInfo session, Guid newGroupingParam, Guid eventContext) { }
-    public void OnSessionDisconnected(AudioSessionInfo session, AudioSessionDisconnectReason disconnectReason) { }
-}
+```sh
+dotnet test Library.UnitTests/Library.UnitTests.csproj -c Release -m:1 --filter FullyQualifiedName~ControllerDisposeRaceTests
 ```
 
-```csharp
-using var audio = new AudioController();
-var logger = new SessionLogger();
+Enable the repository's pre-commit hook in each clone:
 
-using (AudioDevice device = audio.GetDefaultPlaybackDevice())
-{
-    if (device != null)
-    {
-        SessionCollection sessions = device.SessionManager.Sessions;
-
-        // Register on every current session; keep the tokens so they can be disposed.
-        var tokens = new List<IDisposable>();
-        for (int i = 0; i < sessions.Count; i++)
-        {
-            tokens.Add(sessions[i].RegisterAudioSessionNotification(logger));
-        }
-
-        try
-        {
-            Console.WriteLine("Listening... press Enter to stop.");
-            Console.ReadLine();
-        }
-        finally
-        {
-            // Dispose each token to unregister the callbacks.
-            foreach (IDisposable token in tokens)
-            {
-                token.Dispose();
-            }
-        }
-    }
-}
+```sh
+git config core.hooksPath .githooks
 ```
 
-For a single session you can inline the `using`:
+The hook runs the Slopwatch code-quality check before committing.
 
-```csharp
-using (IDisposable token = session.RegisterAudioSessionNotification(logger))
-{
-    // ...callbacks fire here...
-} // token.Dispose() unregisters the callback
+Optional code-quality and coverage checks:
+
+```sh
+dotnet tool restore
+dotnet slopwatch analyze --fail-on warning
+dotnet test Library.UnitTests/Library.UnitTests.csproj -c Release -m:1 --settings coverage.runsettings --collect:"XPlat Code Coverage" --results-directory TestResults
+dotnet reportgenerator -reports:"TestResults/**/coverage.opencover.xml" -targetdir:coverage -reporttypes:"Html;TextSummary"
 ```
 
-Disposing the owning `AudioDevice` (or `AudioSessionControl`) also unregisters any
-still-active callbacks as a safety net, so the tokens are the deterministic path and
-disposal is the backstop.
+## Documentation
 
-## Device notifications
+The [documentation website](https://psulek.github.io/AudioDeviceLib/) includes usage
+guides and a generated public API reference, using DocFX's modern theme.
 
-To be told when endpoints are added/removed, change state, or when the **default device**
-(including the default **communications** device) changes, register an `IAudioDeviceEvents`
-consumer on the controller. Like session notifications, registration returns an `IDisposable`
-token; disposing it (or the controller) unregisters.
+With the repository SDK installed, build and preview from the repository root:
 
-```csharp
-using AudioDeviceLib.Lib;
-using AudioDeviceLib.CoreAudioApi;
-
-sealed class DeviceLogger : IAudioDeviceEvents
-{
-    public void OnDefaultDeviceChanged(DataFlow flow, Role role, string defaultDeviceId)
-    {
-        // role distinguishes the communications default from the console/multimedia default;
-        // defaultDeviceId is null when there is no longer a default for this flow/role.
-        Console.WriteLine($"default {flow}/{role} -> {defaultDeviceId ?? "(none)"}");
-    }
-
-    // The remaining IAudioDeviceEvents members can be left as no-ops.
-    public void OnDeviceStateChanged(string deviceId, DeviceState newState) { }
-    public void OnDeviceAdded(string deviceId) { }
-    public void OnDeviceRemoved(string deviceId) { }
-    public void OnPropertyValueChanged(string deviceId, PropertyKey key) { }
-}
+```sh
+dotnet tool restore
+dotnet docfx docfx/docfx.json --warningsAsErrors
+dotnet docfx serve _site
 ```
 
-```csharp
-using var audio = new AudioController();
+Open <http://localhost:8080>. See the [documentation contributor guide](docfx/articles/contributing.md)
+for editing and GitHub Pages setup. In **Settings > Pages**, select **GitHub Actions**;
+`.github/workflows/docs.yml` validates pull requests and deploys from `main`.
 
-using (IDisposable token = audio.RegisterDeviceNotification(new DeviceLogger()))
-{
-    // ...callbacks fire here (on arbitrary, non-UI threads)...
-} // token.Dispose() unregisters
-```
+## License and credits
 
-> **Threading:** callbacks arrive on arbitrary, non-UI threads and may be concurrent. Keep
-> handlers fast and thread-safe, and don't register/unregister or dispose the controller from
-> inside a callback.
+AudioDeviceLib is licensed under [MIT](LICENSE).
 
-## Default-role semantics
+The managed device API derives from
+[AudioDeviceCmdlets](https://github.com/frgnca/AudioDeviceCmdlets) by Francois Gendron
+(MIT). Its PowerShell layer was replaced with a plain managed API. The Core Audio
+interop incorporates Ray Molenkamp's wrapper under its zlib-style license.
 
-Windows tracks three independent default-device roles. `DefaultRole` is a `[Flags]`
-enum, so you can combine them; each set flag maps to one `Role` assignment.
-
-| Flag | Maps to (`Role`) | Notes |
-|------|------------------|-------|
-| `Console` | `Role.Console` | System sounds, games, voice commands |
-| `Multimedia` | `Role.Multimedia` | Music and movies. Matches `-DefaultOnly` |
-| `Communications` | `Role.Communications` | Voice chat. Matches `-CommunicationOnly` |
-| `Default` (= `Multimedia \| Communications`) | both | The default; matches `Set-AudioDevice` with no switch |
-| `All` (= `Console \| Multimedia \| Communications`) | all three | Make this THE default for everything |
-
-`SetDefaultDevice` defaults to `DefaultRole.Default`, which (like the original cmdlet)
-does **not** set the Console role. If some applications on your target follow the
-Console role, pass `DefaultRole.All` or include `DefaultRole.Console` in the combination.
-
-## Notes for callers
-
-- Endpoint friendly names are **localized** by Windows (e.g. "Reproduktory" on
-  Czech/Slovak systems, "Lautsprecher" on German). Do not hard-code the English
-  word "Speakers" when matching across a mixed fleet; match on a stable substring,
-  or select by kind and default state instead.
-- COM must be usable on the calling thread. In a plain console/service this works
-  out of the box.
-
-## Build
-
-```
-dotnet build
-```
-
-## Tests
-
-```
-dotnet test Library.UnitTests/Library.UnitTests.csproj -c Release
-```
-
-The suite runs three times, once per shipped asset: `net48`, `net7.0-windows` (which is how the
-`netstandard2.0` build gets executed — netstandard cannot be targeted directly) and
-`net8.0-windows`. One test asserts which asset each leg actually loaded, so a silent collapse onto a
-single build would fail rather than pass quietly.
-
-Tests are read-only: nothing changes volume, mute or the default device. Tests that need a real
-endpoint skip themselves on a machine with no audio hardware, so the suite is still meaningful on a
-headless CI runner — what it covers there is COM activation, enumeration and the deterministic
-`Marshal.ReleaseComObject` paths.
+See [third-party notices](THIRD-PARTY-NOTICES.md) for attribution and license terms,
+and [modifications](MODIFICATIONS.md) for the changes to incorporated code.

@@ -1,4 +1,4 @@
-/*
+﻿/*
   LICENSE
   -------
   Copyright (C) 2007-2010 Ray Molenkamp
@@ -28,29 +28,28 @@
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
-    documentation comments.
+  The changes are summarized in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 using System;
-using System.Runtime.InteropServices;
+using AudioDeviceLib.CoreAudioApi.Extensions;
 using AudioDeviceLib.CoreAudioApi.Interfaces;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
 /// <summary>Volume control for a single channel of an audio endpoint.</summary>
-public class AudioEndpointVolumeChannel
+public sealed class AudioEndpointVolumeChannel : IDisposable
 {
-    private uint _Channel;
-    private IAudioEndpointVolume _AudioEndpointVolume;
+    private readonly uint _channel;
+    private readonly IAudioEndpointVolumeCOM _parent;
+    private volatile bool _disposed;
 
-    internal AudioEndpointVolumeChannel(IAudioEndpointVolume parent, int channel)
+
+    internal AudioEndpointVolumeChannel(IAudioEndpointVolumeCOM parent, int channel)
     {
-        _Channel = (uint)channel;
-        _AudioEndpointVolume = parent;
+        _channel = (uint)channel;
+        _parent = parent;
     }
 
     /// <summary>Gets or sets this channel's volume level in decibels, within the endpoint's volume range.</summary>
@@ -59,10 +58,15 @@ public class AudioEndpointVolumeChannel
     {
         get
         {
-            Marshal.ThrowExceptionForHR(_AudioEndpointVolume.GetChannelVolumeLevel(_Channel, out var result));
+            ThrowIfDisposed();
+            InteropUtils.ThrowIfFailed(_parent.GetChannelVolumeLevel(_channel, out var result));
             return result;
         }
-        set => Marshal.ThrowExceptionForHR(_AudioEndpointVolume.SetChannelVolumeLevel(_Channel, value, Guid.Empty));
+        set
+        {
+            ThrowIfDisposed();
+            InteropUtils.ThrowIfFailed(_parent.SetChannelVolumeLevel(_channel, value));
+        }
     }
 
     /// <summary>Gets or sets this channel's volume as a normalized scalar in the range 0.0 to 1.0.</summary>
@@ -71,10 +75,23 @@ public class AudioEndpointVolumeChannel
     {
         get
         {
-            Marshal.ThrowExceptionForHR(_AudioEndpointVolume.GetChannelVolumeLevelScalar(_Channel, out var result));
+            ThrowIfDisposed();
+            InteropUtils.ThrowIfFailed(_parent.GetChannelVolumeLevelScalar(_channel, out var result));
             return result;
         }
-        set => Marshal.ThrowExceptionForHR(
-            _AudioEndpointVolume.SetChannelVolumeLevelScalar(_Channel, value, Guid.Empty));
+        set
+        {
+            ThrowIfDisposed();
+            InteropUtils.ThrowIfFailed(
+            _parent.SetChannelVolumeLevelScalar(_channel, value));
+        }
+    }
+
+    /// <summary>Invalidates this wrapper without releasing externally held COM references.</summary>
+    public void Dispose() => _disposed = true;
+
+    private void ThrowIfDisposed()
+    {
+        InteropUtils.RequireNotDisposed(_disposed, this);
     }
 }

@@ -28,15 +28,12 @@
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
-    documentation comments.
+  The changes are summarized in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
 using System;
-using System.Runtime.InteropServices;
+using AudioDeviceLib.CoreAudioApi.Extensions;
 using AudioDeviceLib.CoreAudioApi.Interfaces;
 
 namespace AudioDeviceLib.CoreAudioApi;
@@ -45,13 +42,13 @@ namespace AudioDeviceLib.CoreAudioApi;
 /// Managed wrapper over the Core Audio <c>ISimpleAudioVolume</c> interface. Provides per-session
 /// master volume and mute control.
 /// </summary>
-public class SimpleAudioVolume
+public sealed class SimpleAudioVolume : IDisposable
 {
-    ISimpleAudioVolume _SimpleAudioVolume;
+    ISimpleAudioVolumeCOM _simpleAudioVolume;
 
-    internal SimpleAudioVolume(ISimpleAudioVolume realSimpleVolume)
+    internal SimpleAudioVolume(ISimpleAudioVolumeCOM realSimpleVolume)
     {
-        _SimpleAudioVolume = realSimpleVolume;
+        _simpleAudioVolume = realSimpleVolume;
     }
 
     /// <summary>Gets or sets the session master volume as a normalized scalar in the range 0.0 to 1.0.</summary>
@@ -60,13 +57,14 @@ public class SimpleAudioVolume
     {
         get
         {
-            Marshal.ThrowExceptionForHR(_SimpleAudioVolume.GetMasterVolume(out var ret));
+            ThrowIfDisposed();
+            InteropUtils.ThrowIfFailed(_simpleAudioVolume.GetMasterVolume(out var ret));
             return ret;
         }
         set
         {
-            Guid Empty = Guid.Empty;
-            Marshal.ThrowExceptionForHR(_SimpleAudioVolume.SetMasterVolume(value, ref Empty));
+            ThrowIfDisposed();
+            InteropUtils.ThrowIfFailed(_simpleAudioVolume.SetMasterVolume(value));
         }
     }
 
@@ -76,13 +74,23 @@ public class SimpleAudioVolume
     {
         get
         {
-            Marshal.ThrowExceptionForHR(_SimpleAudioVolume.GetMute(out var ret));
+            ThrowIfDisposed();
+            InteropUtils.ThrowIfFailed(_simpleAudioVolume.GetMute(out bool ret));
             return ret;
         }
         set
         {
-            Guid Empty = Guid.Empty;
-            Marshal.ThrowExceptionForHR(_SimpleAudioVolume.SetMute(value, ref Empty));
+            ThrowIfDisposed();
+            InteropUtils.ThrowIfFailed(_simpleAudioVolume.SetMute(value));
         }
+    }
+    private volatile bool _disposed;
+
+    /// <summary>Invalidates this wrapper without releasing externally held COM references.</summary>
+    public void Dispose() => _disposed = true;
+
+    private void ThrowIfDisposed()
+    {
+        InteropUtils.RequireNotDisposed(_disposed, this);
     }
 }

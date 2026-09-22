@@ -1,4 +1,4 @@
-/*
+﻿/*
   LICENSE
   -------
   Copyright (C) 2007-2010 Ray Molenkamp
@@ -28,36 +28,32 @@
   (https://github.com/psulek/AudioDeviceLib), starting from the copy bundled in
   AudioDeviceCmdlets (https://github.com/frgnca/AudioDeviceCmdlets, MIT).
 
-  Changes from the original:
-  - Namespace changed to `AudioDeviceLib.CoreAudioApi` (file-scoped); unused `using`
-    directives removed.
-  - Reformatted to the project's C# style (full braces, modern C# syntax) and annotated with XML
-    documentation comments.
+  The changes are summarized in MODIFICATIONS.md at the repository root; the Git history of
+  this file is the authoritative record.
 */
 
-using System.Runtime.InteropServices;
 using AudioDeviceLib.CoreAudioApi.Interfaces;
 
 namespace AudioDeviceLib.CoreAudioApi;
 
 /// <summary>Describes the supported volume range of an audio endpoint, in decibels.</summary>
-public class AudioEndPointVolumeVolumeRange
+public readonly record struct AudioEndPointVolumeVolumeRange
 {
-    float _VolumeMindB;
-    float _VolumeMaxdB;
-    float _VolumeIncrementdB;
+    readonly float _volumeMindB;
+    readonly float _volumeMaxdB;
+    readonly float _volumeIncrementdB;
 
-    internal AudioEndPointVolumeVolumeRange(IAudioEndpointVolume parent)
+    internal AudioEndPointVolumeVolumeRange(IAudioEndpointVolumeCOM parent)
     {
-        Marshal.ThrowExceptionForHR(parent.GetVolumeRange(out _VolumeMindB, out _VolumeMaxdB, out _VolumeIncrementdB));
+        InteropUtils.ThrowIfFailed(parent.GetVolumeRange(out _volumeMindB, out _volumeMaxdB, out _volumeIncrementdB));
     }
 
     /// <summary>Gets the minimum supported volume level, in decibels.</summary>
-    public float MindB => _VolumeMindB;
+    public float MindB => _volumeMindB;
 
     /// <summary>Gets the maximum supported volume level, in decibels.</summary>
-    public float MaxdB => _VolumeMaxdB;
+    public float MaxdB => _volumeMaxdB;
 
     /// <summary>Gets the volume increment between consecutive steps, in decibels.</summary>
-    public float IncrementdB => _VolumeIncrementdB;
+    public float IncrementdB => _volumeIncrementdB;
 }
