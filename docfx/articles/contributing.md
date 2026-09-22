@@ -64,3 +64,8 @@ protection rules require approval, approve the deployment in GitHub Actions.
 
 The API reference reflects the source on `main`, which may include changes newer
 than the published NuGet package.
+
+## Publish new NuGet version
+
+Push a git tag named with the package version in `v{version}` format, for example
+`v1.0.0-rc.2`.

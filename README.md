@@ -23,6 +23,7 @@ notifications directly from C#.
 - [Compatibility and diagnostics](#compatibility-and-diagnostics)
 - [Build and test](#build-and-test)
 - [Documentation](#documentation)
+- [Contributing](#contributing)
 - [License and credits](#license-and-credits)
 
 ## Requirements
@@ -173,6 +174,11 @@ dotnet docfx serve _site
 Open <http://localhost:8080>. See the [documentation contributor guide](docfx/articles/contributing.md)
 for editing and GitHub Pages setup. In **Settings > Pages**, select **GitHub Actions**;
 `.github/workflows/docs.yml` validates pull requests and deploys from `main`.
+
+## Contributing
+
+See the [contribution guide](https://psulek.github.io/AudioDeviceLib/articles/contributing.html)
+for build, test, documentation, and release publishing notes.
 
 ## License and credits
 
